@@ -1,0 +1,31 @@
+// One Worker serves the Angular app (static assets) and the API under /api.
+// Same origin, so no CORS. Secrets are not needed: Neon credentials live inside the Hyperdrive config.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "banmoom",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    // Built by `npm run build:web` (Angular production build).
+    "directory": "../frontend/dist/frontend/browser",
+    "binding": "ASSETS",
+    // Deep links like /stock/ing-123 load index.html; Angular's router takes over from there.
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  // "banmoom-db" → Neon. Create with:
+  //   npx wrangler hyperdrive create banmoom-db --connection-string="<Neon pooled connection string>"
+  // then paste the id below. Local `wrangler dev` uses localConnectionString instead
+  // (override with env CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE, e.g. a Neon dev branch).
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "REPLACE_WITH_HYPERDRIVE_ID",
+      "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54329/postgres"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

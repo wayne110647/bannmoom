@@ -1,0 +1,62 @@
+<app-page-header title="เมนูขนม" subtitle="ราคาขาย ต้นทุน และกำไรต่อชิ้น">
+  <a routerLink="/recipes/new" class="btn-primary">
+    <app-icon name="plus" [size]="18" /> <span class="hidden sm:inline">เพิ่มเมนู</span>
+  </a>
+</app-page-header>
+
+<div class="mb-4 space-y-3">
+  <label class="relative block">
+    <span class="sr-only">ค้นหาเมนู</span>
+    <app-icon name="search" [size]="18" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted" />
+    <input type="search" class="input pl-10" placeholder="ค้นหาชื่อขนม..." [ngModel]="search()" (ngModelChange)="search.set($event)" />
+  </label>
+  <div class="-mx-4 flex gap-2 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+    @for (c of categories; track c.value) {
+      <button type="button" class="chip" [class.chip-active]="category() === c.value" (click)="category.set(c.value)">{{ c.label }}</button>
+    }
+  </div>
+</div>
+
+@let s = products.state();
+@if (s.status === 'loading') {
+  <app-loading [rows]="4" />
+} @else if (s.status === 'error') {
+  <app-error-state [message]="s.message" (retry)="products.reload()" />
+} @else if (s.data.length === 0) {
+  <app-empty-state icon="cake" title="ยังไม่มีเมนูขนม" detail="เพิ่มเมนูพร้อมวัตถุดิบที่ใช้ ระบบจะคิดต้นทุนให้">
+    <a routerLink="/recipes/new" class="btn-primary"><app-icon name="plus" [size]="18" /> เพิ่มเมนูแรก</a>
+  </app-empty-state>
+} @else if (visible().length === 0) {
+  <app-empty-state icon="search" title="ไม่พบเมนูที่ค้นหา" />
+} @else {
+  <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    @for (p of visible(); track p.id) {
+      @let profit = this.profit(p);
+      <li class="card flex flex-col p-2.5" [class.opacity-60]="!p.isActive">
+        <app-product-thumb [name]="p.name" [imageUrl]="p.imageUrl" [category]="p.category" class="aspect-[4/3] w-full" />
+        <div class="flex flex-1 flex-col px-1 pt-2.5">
+          <p class="line-clamp-1 font-normal">{{ p.name }}</p>
+          <p class="num text-primary-dark">{{ p.sellPrice | baht: true }} <span class="text-xs text-muted">/{{ p.saleUnit }}</span></p>
+
+          <dl class="mt-2 space-y-0.5 text-xs">
+            <div class="flex justify-between"><dt class="text-muted">ต้นทุน</dt>
+              <dd class="num">@if (p.costPerPiece !== null) { {{ p.costPerPiece | baht }} } @else { <span class="text-warning">{{ p.recipeId ? 'ราคาวัตถุดิบไม่ครบ' : 'ยังไม่มีสูตร' }}</span> }</dd>
+            </div>
+            @if (profit !== null) {
+              <div class="flex justify-between"><dt class="text-muted">กำไร</dt>
+                <dd class="num" [class]="profit >= 0 ? 'text-success' : 'text-danger'">{{ profit | baht }}</dd>
+              </div>
+            }
+          </dl>
+
+          <div class="mt-auto flex items-center justify-between pt-2.5">
+            <span [class]="p.isActive ? 'badge-success' : 'badge-neutral'">{{ p.isActive ? 'เปิดขาย' : 'หยุดขาย' }}</span>
+            @if (p.recipeId) {
+              <a [routerLink]="['/cost']" [queryParams]="{ recipe: p.recipeId }" class="text-xs text-primary hover:underline">คำนวณต้นทุน</a>
+            }
+          </div>
+        </div>
+      </li>
+    }
+  </ul>
+}

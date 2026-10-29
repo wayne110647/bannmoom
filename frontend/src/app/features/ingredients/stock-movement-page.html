@@ -1,0 +1,83 @@
+<app-page-header [title]="meta.title" [backLink]="['/stock', id]" />
+
+@let s = ingredient.state();
+@if (s.status === 'loading') {
+  <app-loading [rows]="3" />
+} @else if (s.status === 'error') {
+  <app-error-state [message]="s.message" (retry)="ingredient.reload()" />
+} @else {
+  @let ing = s.data;
+  <div class="mx-auto max-w-xl space-y-5">
+    <section class="card flex items-center gap-3 p-4">
+      <span class="flex size-11 items-center justify-center rounded-xl bg-soft text-primary"><app-icon [name]="meta.icon" [size]="22" /></span>
+      <div class="flex-1">
+        <p class="font-normal">{{ ing.name }}</p>
+        <p class="text-sm text-muted">คงเหลือตอนนี้ <span class="num text-primary-dark">{{ ing.quantityOnHand | qty: ing.baseUnit : ing.displayUnit }}</span></p>
+      </div>
+    </section>
+
+    @if (type === 'in') {
+      <section class="card card-pad">
+        <app-stock-in-fields [form]="stockInForm" [baseUnit]="ing.baseUnit" [displayUnit]="ing.displayUnit" />
+      </section>
+    } @else {
+      <form [formGroup]="qtyForm" class="card card-pad space-y-4" (ngSubmit)="submit(ing)">
+        <div class="grid grid-cols-[1fr_auto] gap-2">
+          <label class="field">
+            <span class="label">{{ type === 'use' ? 'จำนวนที่เบิกใช้' : 'จำนวนที่นับได้จริง' }}</span>
+            <input type="number" inputmode="decimal" class="input num text-lg" formControlName="quantity" placeholder="0" />
+          </label>
+          <label class="field">
+            <span class="label">หน่วย</span>
+            <select class="input" formControlName="unit">
+              @for (u of unitsFor(ing); track u) { <option [value]="u">{{ unitLabel(u) }}</option> }
+            </select>
+          </label>
+        </div>
+
+        @if (type === 'adjust') {
+          <fieldset class="field">
+            <legend class="label mb-1.5">เหตุผล *</legend>
+            <div class="flex flex-wrap gap-2">
+              @for (r of reasons; track r) {
+                <label class="chip cursor-pointer has-checked:border-primary has-checked:bg-primary has-checked:text-white">
+                  <input type="radio" class="sr-only" formControlName="reason" [value]="r" /> {{ r }}
+                </label>
+              }
+            </div>
+          </fieldset>
+        }
+
+        <label class="field">
+          <span class="label">หมายเหตุ <span class="text-muted">(ถ้ามี)</span></span>
+          <input type="text" class="input" formControlName="note" [placeholder]="type === 'use' ? 'เช่น ทำบราวนี่ 2 ถาด' : 'เช่น นับสต็อกสิ้นเดือน'" />
+        </label>
+
+        @if (preview(); as p) {
+          @if ('error' in p) {
+            <p class="flex items-center gap-2 rounded-xl bg-danger/10 p-3 text-sm text-danger"><app-icon name="alert" [size]="18" /> {{ p.error }}</p>
+          } @else {
+            <div class="rounded-xl bg-soft/70 p-3 text-sm">
+              <div class="flex justify-between">
+                <span class="text-muted">เปลี่ยนแปลง</span>
+                <span class="num" [class]="p.delta >= 0 ? 'text-success' : 'text-danger'">
+                  {{ p.delta >= 0 ? '+' : '−' }}{{ (p.delta < 0 ? -p.delta : p.delta) | qty: ing.baseUnit : ing.displayUnit }}
+                </span>
+              </div>
+              <div class="flex justify-between font-normal text-primary-dark">
+                <span>คงเหลือหลังบันทึก</span>
+                <span class="num">{{ p.after | qty: ing.baseUnit : ing.displayUnit }}</span>
+              </div>
+            </div>
+          }
+        }
+      </form>
+    }
+
+    <div class="sticky bottom-20 z-10 lg:static">
+      <button type="button" class="btn-primary btn-block shadow-lg lg:shadow-none" [disabled]="saving()" (click)="submit(ing)">
+        @if (saving()) { กำลังบันทึก... } @else { <app-icon name="save" [size]="18" /> ยืนยันบันทึก }
+      </button>
+    </div>
+  </div>
+}

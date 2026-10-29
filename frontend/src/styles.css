@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Baan Moom Homemade — Design System
+   Colors, fonts and shared component classes live here only.
+   Components use these tokens via Tailwind utilities
+   (bg-primary, text-ink, border-line ...) or the classes below.
+   ============================================================ */
+
+@theme {
+  --color-primary: #806451;
+  --color-primary-dark: #513b2f;
+  --color-secondary: #c9a88d;
+  --color-cream: #faf6f0;
+  --color-soft: #f3ece3;
+  --color-surface: #ffffff;
+  --color-line: #e9ded2;
+  --color-ink: #3f3029;
+  --color-muted: #8c7a6d;
+  --color-warning: #d99543;
+  --color-danger: #c95d52;
+  --color-success: #5c946b;
+
+  --font-sans: "Prompt", "Noto Sans Thai", system-ui, sans-serif;
+
+  --shadow-card: 0 1px 2px rgb(81 59 47 / 0.04), 0 4px 16px rgb(81 59 47 / 0.06);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-cream font-sans text-ink antialiased;
+    font-weight: 300;
+  }
+  h1, h2, h3, strong, b {
+    font-weight: 500;
+  }
+  input, select, textarea, button {
+    font: inherit;
+  }
+}
+
+@layer components {
+  /* ---------- Surfaces ---------- */
+  .card {
+    @apply rounded-2xl border border-line bg-surface;
+    box-shadow: var(--shadow-card);
+  }
+  .card-pad {
+    @apply p-4 sm:p-5;
+  }
+  .section-title {
+    @apply mb-3 text-base font-medium text-primary-dark;
+  }
+
+  /* ---------- Buttons (min 44px tall for fingers) ---------- */
+  .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-normal
+      transition-colors select-none disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-primary-dark active:bg-primary-dark;
+  }
+  .btn-secondary {
+    @apply border border-line bg-surface text-primary-dark hover:bg-soft;
+  }
+  .btn-ghost {
+    @apply text-primary hover:bg-soft;
+  }
+  .btn-danger {
+    @apply bg-danger text-white hover:opacity-90;
+  }
+  .btn-block {
+    @apply w-full;
+  }
+  .icon-btn {
+    @apply inline-flex size-11 items-center justify-center rounded-xl text-primary hover:bg-soft;
+  }
+
+  /* ---------- Forms ---------- */
+  .field {
+    @apply flex flex-col gap-1.5;
+  }
+  .label {
+    @apply text-sm font-normal text-primary-dark;
+  }
+  .hint {
+    @apply text-xs text-muted;
+  }
+  .error-text {
+    @apply text-xs text-danger;
+  }
+  .input {
+    @apply min-h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-base text-ink
+      placeholder:text-muted/70 outline-none transition
+      focus:border-primary focus:ring-2 focus:ring-primary/15
+      disabled:bg-soft disabled:text-muted;
+  }
+  .input.ng-invalid.ng-touched {
+    @apply border-danger focus:ring-danger/15;
+  }
+  textarea.input {
+    @apply py-2.5;
+  }
+
+  /* ---------- Chips & badges ---------- */
+  .chip {
+    @apply inline-flex min-h-9 shrink-0 items-center rounded-full border border-line bg-surface px-4 text-sm
+      text-primary-dark transition-colors hover:bg-soft;
+  }
+  .chip-active {
+    @apply border-primary bg-primary text-white hover:bg-primary;
+  }
+  .badge, .badge-success, .badge-warning, .badge-danger, .badge-neutral {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-normal whitespace-nowrap;
+  }
+  .badge-success { @apply bg-success/12 text-success; }
+  .badge-warning { @apply bg-warning/15 text-[#a8681f]; }
+  .badge-danger  { @apply bg-danger/12 text-danger; }
+  .badge-neutral { @apply bg-soft text-muted; }
+
+  /* ---------- Numbers ---------- */
+  .stat-value {
+    @apply num text-2xl font-medium text-primary-dark;
+  }
+
+  /* ---------- Tables (desktop only) ---------- */
+  .table {
+    @apply w-full text-sm;
+  }
+  .table th {
+    @apply border-b border-line px-3 py-2.5 text-left text-xs font-normal text-muted;
+  }
+  .table td {
+    @apply border-b border-line/70 px-3 py-3;
+  }
+  .table tr:last-child td {
+    @apply border-b-0;
+  }
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}

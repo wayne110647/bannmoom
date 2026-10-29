@@ -1,0 +1,31 @@
+{
+  "name": "banmoom-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:db": "node scripts/local-db.mjs",
+    "dev": "wrangler dev",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
+    "build:web": "npm --prefix ../frontend run build",
+    "deploy": "npm run build:web && wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "hono": "^4.13.14",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261029.1",
+    "@electric-sql/pglite": "^0.5.13",
+    "@electric-sql/pglite-socket": "^0.2.16",
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
+    "wrangler": "^4.155.0"
+  }
+}

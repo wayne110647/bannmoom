@@ -1,0 +1,92 @@
+<app-page-header title="สต็อกวัตถุดิบ" subtitle="ดูยอดคงเหลือ รับเข้า และเบิกใช้วัตถุดิบ">
+  <a routerLink="/stock/new" class="btn-primary hidden lg:inline-flex">
+    <app-icon name="plus" [size]="18" /> เพิ่มวัตถุดิบ
+  </a>
+</app-page-header>
+
+<!-- Phone/tablet: thumb-reachable add button above the bottom nav -->
+<a routerLink="/stock/new" aria-label="เพิ่มวัตถุดิบ"
+  class="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-white shadow-lg active:bg-primary-dark lg:hidden">
+  <app-icon name="plus" [size]="26" />
+</a>
+
+<div class="mb-4 space-y-3">
+  <label class="relative block">
+    <span class="sr-only">ค้นหาวัตถุดิบ</span>
+    <app-icon name="search" [size]="18" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted" />
+    <input type="search" class="input pl-10" placeholder="ค้นหาวัตถุดิบ..." [ngModel]="search()" (ngModelChange)="search.set($event)" />
+  </label>
+  <div class="-mx-4 flex gap-2 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+    @for (f of filters; track f.value) {
+      <button type="button" class="chip" [class.chip-active]="(filter() ?? 'all') === f.value" (click)="setFilter(f.value)">
+        {{ f.label }}
+      </button>
+    }
+  </div>
+</div>
+
+@let s = ingredients.state();
+@if (s.status === 'loading') {
+  <app-loading [rows]="5" />
+} @else if (s.status === 'error') {
+  <app-error-state [message]="s.message" (retry)="ingredients.reload()" />
+} @else if (s.data.length === 0) {
+  <app-empty-state title="ยังไม่มีวัตถุดิบ" detail="เริ่มจากเพิ่มวัตถุดิบที่ใช้บ่อย เช่น แป้ง น้ำตาล เนย ไข่">
+    <a routerLink="/stock/new" class="btn-primary"><app-icon name="plus" [size]="18" /> เพิ่มวัตถุดิบแรก</a>
+  </app-empty-state>
+} @else if (visible().length === 0) {
+  <app-empty-state icon="search" title="ไม่พบวัตถุดิบที่ค้นหา" detail="ลองเปลี่ยนคำค้นหาหรือตัวกรอง" />
+} @else {
+  <!-- Phone/tablet: cards -->
+  <ul class="grid gap-2.5 pb-12 sm:grid-cols-2 lg:hidden">
+    @for (ing of visible(); track ing.id) {
+      <li>
+        <a [routerLink]="['/stock', ing.id]" class="card flex h-full items-center gap-3 p-3.5 active:bg-soft/50">
+          <div class="min-w-0 flex-1">
+            <p class="truncate font-normal">{{ ing.name }}</p>
+            <p class="text-xs text-muted">{{ categoryLabel[ing.category] }} · ขั้นต่ำ {{ ing.minQuantity | qty: ing.baseUnit : ing.displayUnit }}</p>
+            <app-ingredient-badges [ingredient]="ing" class="mt-1.5" />
+          </div>
+          <div class="text-right">
+            <p class="num text-lg font-medium text-primary-dark">{{ ing.quantityOnHand | qty: ing.baseUnit : ing.displayUnit : false }}</p>
+            <p class="text-xs text-muted">{{ ing.displayUnit | unit: true }}</p>
+          </div>
+          <app-icon name="chevron-right" [size]="18" class="text-muted" />
+        </a>
+      </li>
+    }
+  </ul>
+
+  <!-- Desktop: table -->
+  <div class="card hidden overflow-x-auto lg:block">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ชื่อวัตถุดิบ</th>
+          <th>หมวดหมู่</th>
+          <th class="text-right">คงเหลือ</th>
+          <th class="text-right">ขั้นต่ำ</th>
+          <th class="text-right">ต้นทุนเฉลี่ย</th>
+          <th>สถานะ</th>
+          <th class="w-10"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (ing of visible(); track ing.id) {
+          <tr class="cursor-pointer hover:bg-soft/40" [routerLink]="['/stock', ing.id]">
+            <td class="font-normal">{{ ing.name }}</td>
+            <td class="whitespace-nowrap text-muted">{{ categoryLabel[ing.category] }}</td>
+            <td class="num text-right font-medium whitespace-nowrap text-primary-dark">{{ ing.quantityOnHand | qty: ing.baseUnit : ing.displayUnit }}</td>
+            <td class="num text-right whitespace-nowrap text-muted">{{ ing.minQuantity | qty: ing.baseUnit : ing.displayUnit }}</td>
+            <td class="num text-right whitespace-nowrap text-muted">
+              @if (ing.avgCostPerBaseUnit !== null) { {{ ing.avgCostPerBaseUnit | unitCost: ing.baseUnit : ing.displayUnit }} }
+              @else { <span class="text-warning">ยังไม่มีราคา</span> }
+            </td>
+            <td><app-ingredient-badges [ingredient]="ing" /></td>
+            <td><app-icon name="chevron-right" [size]="18" class="text-muted" /></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

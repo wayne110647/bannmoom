@@ -1,0 +1,69 @@
+<app-page-header [title]="isEdit ? 'แก้ไขวัตถุดิบ' : 'เพิ่มวัตถุดิบ'" [backLink]="cancelLink()" />
+
+@if (loadState() === 'loading') {
+  <app-loading [rows]="3" />
+} @else if (loadState() === 'error') {
+  <app-error-state [message]="loadError()" (retry)="load()" />
+} @else {
+  <form [formGroup]="form" (ngSubmit)="submit()" class="mx-auto max-w-xl space-y-5" novalidate>
+    <section class="card card-pad space-y-4">
+      <label class="field">
+        <span class="label">ชื่อวัตถุดิบ *</span>
+        <input type="text" class="input" formControlName="name" placeholder="เช่น แป้งเค้ก ตราบัวแดง" autocomplete="off" />
+        @if (form.controls.name.touched && form.controls.name.invalid) {
+          <span class="error-text">กรุณาระบุชื่อวัตถุดิบ</span>
+        }
+      </label>
+
+      <label class="field">
+        <span class="label">หมวดหมู่</span>
+        <select class="input" formControlName="category">
+          @for (c of categories; track c.value) { <option [value]="c.value">{{ c.label }}</option> }
+        </select>
+      </label>
+
+      <div class="grid grid-cols-2 gap-3">
+        <label class="field">
+          <span class="label">หน่วยที่ใช้ดู</span>
+          <select class="input" formControlName="displayUnit">
+            @for (u of unitOptions(); track u) { <option [value]="u">{{ unitLabel(u) }}</option> }
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">แจ้งเตือนเมื่อเหลือไม่ถึง</span>
+          <input type="number" inputmode="decimal" class="input num" formControlName="minQuantity" />
+          @if (form.controls.minQuantity.touched && form.controls.minQuantity.invalid) {
+            <span class="error-text">ต้องเป็น 0 หรือมากกว่า</span>
+          }
+        </label>
+      </div>
+      <p class="hint">ระบบเก็บยอดเป็น {{ unitLabel(baseUnit()) }} และแปลงหน่วยให้อัตโนมัติ (เช่น 1 กิโลกรัม = 1,000 กรัม)</p>
+    </section>
+
+    @if (isEdit) {
+      <p class="flex gap-2 rounded-xl bg-soft/70 p-3 text-sm text-muted">
+        <app-icon name="info" [size]="18" class="mt-0.5" />
+        ยอดคงเหลือแก้ที่หน้านี้ไม่ได้ ใช้ปุ่ม “รับเข้า / เบิกใช้ / ปรับยอด” เพื่อให้มีประวัติทุกครั้ง
+      </p>
+    } @else {
+      <section class="card card-pad space-y-4">
+        <label class="flex min-h-11 cursor-pointer items-center gap-3">
+          <input type="checkbox" class="size-5 accent-primary" formControlName="hasOpening" />
+          <span>
+            <span class="block font-normal text-primary-dark">มีของอยู่แล้ว — บันทึกยอดตั้งต้น</span>
+            <span class="hint">ใส่ขนาดและราคาที่ซื้อ ระบบจะคำนวณต้นทุนต่อหน่วยให้</span>
+          </span>
+        </label>
+        @if (hasOpening()) {
+          <app-stock-in-fields [form]="opening" [baseUnit]="baseUnit()" [displayUnit]="displayUnit()" />
+        }
+      </section>
+    }
+
+    <div class="sticky bottom-20 z-10 lg:static">
+      <button type="submit" class="btn-primary btn-block shadow-lg lg:shadow-none" [disabled]="saving()">
+        @if (saving()) { กำลังบันทึก... } @else { <app-icon name="save" [size]="18" /> บันทึก }
+      </button>
+    </div>
+  </form>
+}

@@ -1,0 +1,42 @@
+import { Observable } from 'rxjs';
+import {
+  AdjustmentInput, CostCalculationInput, DashboardSummary, Ingredient, IngredientInput, NewIngredientInput,
+  MenuRecipeInput, Product, Recipe, SavedCostCalculation, StockInInput, StockTransaction, UsageInput,
+} from '../models';
+
+/**
+ * Data-access contracts. Components depend only on these abstract classes.
+ * app.config.ts decides whether the Mock* (sample data) or Http* (real API)
+ * implementation is provided — see environment.dataSource.
+ */
+
+export abstract class IngredientRepository {
+  abstract list(): Observable<Ingredient[]>;
+  abstract get(id: string): Observable<Ingredient>;
+  abstract create(input: NewIngredientInput): Observable<Ingredient>;
+  abstract update(id: string, input: IngredientInput): Observable<Ingredient>;
+  abstract transactions(id: string): Observable<StockTransaction[]>;
+  abstract stockIn(id: string, input: StockInInput): Observable<Ingredient>;
+  abstract usage(id: string, input: UsageInput): Observable<Ingredient>;
+  abstract adjust(id: string, input: AdjustmentInput): Observable<Ingredient>;
+}
+
+export abstract class ProductRepository {
+  abstract list(): Observable<Product[]>;
+}
+
+export abstract class RecipeRepository {
+  abstract list(): Observable<Recipe[]>;
+  abstract get(id: string): Observable<Recipe>;
+  /** Creates the recipe and its menu item (product) together. */
+  abstract create(input: MenuRecipeInput): Observable<Recipe>;
+  abstract update(id: string, input: MenuRecipeInput): Observable<Recipe>;
+}
+
+export abstract class CostCalculationRepository {
+  abstract save(input: CostCalculationInput): Observable<SavedCostCalculation>;
+}
+
+export abstract class DashboardRepository {
+  abstract summary(): Observable<DashboardSummary>;
+}

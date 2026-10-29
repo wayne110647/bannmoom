@@ -1,0 +1,91 @@
+<app-toasts />
+
+<div class="min-h-dvh lg:flex">
+  <!-- ============ Desktop sidebar ============ -->
+  <aside class="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-surface/70 lg:flex">
+    <a routerLink="/" class="flex flex-col items-center px-6 pt-6 pb-4">
+      <img [src]="brand.logo" [alt]="brand.name" class="h-24 w-auto mix-blend-multiply" />
+    </a>
+
+    <nav class="flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label="เมนูหลัก">
+      @for (item of mainNav; track item.path) {
+        <a [routerLink]="item.path" routerLinkActive="bg-primary! text-white!"
+          [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+          class="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm text-primary-dark hover:bg-soft">
+          <app-icon [name]="item.icon" />
+          <span class="flex-1">{{ sidebarLabel[item.path] ?? item.label }}</span>
+          @if (item.comingSoon) { <span class="badge-neutral">เร็ว ๆ นี้</span> }
+        </a>
+      }
+
+      <button type="button" (click)="moreOpen.set(!moreOpen())" [attr.aria-expanded]="moreOpen()"
+        class="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm text-primary-dark hover:bg-soft">
+        <app-icon name="grid" />
+        <span class="flex-1 text-left">เพิ่มเติม</span>
+        <app-icon name="chevron-down" [size]="16" class="transition-transform" [class.rotate-180]="moreOpen()" />
+      </button>
+      @if (moreOpen()) {
+        <div class="space-y-0.5 pl-4">
+          @for (item of moreNav; track item.path) {
+            <a [routerLink]="item.path" routerLinkActive="bg-soft! text-primary-dark! font-normal"
+              class="flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm text-muted hover:bg-soft">
+              <app-icon [name]="item.icon" [size]="18" />
+              <span class="flex-1">{{ item.label }}</span>
+              @if (item.comingSoon) { <span class="badge-neutral">เร็ว ๆ นี้</span> }
+            </a>
+          }
+        </div>
+      }
+    </nav>
+  </aside>
+
+  <!-- ============ Main column ============ -->
+  <div class="flex min-w-0 flex-1 flex-col">
+    <!-- Mobile top bar -->
+    <header class="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-cream/90 px-4 py-2 backdrop-blur lg:hidden">
+      <a routerLink="/" class="flex items-center gap-2">
+        <img [src]="brand.logo" alt="" class="size-10 rounded-full object-cover mix-blend-multiply" />
+        <span class="text-base font-medium text-primary-dark">{{ brand.shortName }}</span>
+      </a>
+    </header>
+
+    @if (usingMockData) {
+      <div class="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-1.5 text-xs text-[#8a5a1c] lg:px-8" role="note">
+        <app-icon name="info" [size]="16" />
+        <span><strong class="font-medium">ข้อมูลตัวอย่าง</strong><span class="sm:hidden"> — รีเฟรชแล้วข้อมูลหาย</span><span class="hidden sm:inline"> — ยังไม่ได้เชื่อมฐานข้อมูลจริง ข้อมูลที่บันทึกจะหายเมื่อรีเฟรชหน้า</span></span>
+      </div>
+    }
+
+    @if (!online()) {
+      <div class="flex items-center gap-2 bg-danger px-4 py-2 text-sm text-white lg:px-8" role="alert">
+        <app-icon name="wifi-off" [size]="18" />
+        <span>ไม่มีอินเทอร์เน็ต — ยังบันทึกข้อมูลไม่ได้จนกว่าจะเชื่อมต่อใหม่</span>
+      </div>
+    }
+
+    <main class="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-28 sm:px-6 lg:px-8 lg:pt-8 lg:pb-10">
+      <router-outlet />
+    </main>
+  </div>
+</div>
+
+<!-- ============ Mobile bottom navigation (5 items) ============ -->
+<nav class="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur lg:hidden" aria-label="เมนูหลัก">
+  <div class="mx-auto grid max-w-lg grid-cols-5">
+    @for (item of mainNav; track item.path) {
+      <a [routerLink]="item.path" routerLinkActive="text-primary-dark! [&_.dot]:opacity-100"
+        [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+        class="flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] text-muted">
+        <app-icon [name]="item.icon" [size]="22" />
+        <span>{{ item.label }}</span>
+        <span class="dot size-1 rounded-full bg-primary opacity-0"></span>
+      </a>
+    }
+    <a routerLink="/more" class="flex min-h-16 flex-col items-center justify-center gap-1 text-[11px]"
+      [class]="moreActive() ? 'text-primary-dark' : 'text-muted'">
+      <app-icon name="grid" [size]="22" />
+      <span>เพิ่มเติม</span>
+      <span class="size-1 rounded-full bg-primary" [class.opacity-0]="!moreActive()"></span>
+    </a>
+  </div>
+</nav>

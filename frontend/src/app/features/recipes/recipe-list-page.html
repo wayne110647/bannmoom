@@ -1,0 +1,54 @@
+<app-page-header title="สูตรขนม" subtitle="วัตถุดิบต่อ 1 รอบผลิต ใช้คิดต้นทุนของแต่ละเมนู">
+  <a routerLink="/recipes/new" class="btn-primary">
+    <app-icon name="plus" [size]="18" /> <span class="hidden sm:inline">เพิ่มเมนู</span>
+  </a>
+</app-page-header>
+
+@let s = data.state();
+@if (s.status === 'loading') {
+  <app-loading [rows]="4" />
+} @else if (s.status === 'error') {
+  <app-error-state [message]="s.message" (retry)="data.reload()" />
+} @else if (rows().length === 0) {
+  <app-empty-state icon="book" title="ยังไม่มีสูตรขนม" detail="เพิ่มเมนูพร้อมวัตถุดิบที่ใช้ ระบบจะคิดต้นทุนต่อชิ้นให้ทันที">
+    <a routerLink="/recipes/new" class="btn-primary"><app-icon name="plus" [size]="18" /> เพิ่มเมนูแรก</a>
+  </app-empty-state>
+} @else {
+  <ul class="grid gap-3 md:grid-cols-2">
+    @for (row of rows(); track row.recipe.id) {
+      @let p = row.product;
+      <li class="card flex gap-3 p-3">
+        <app-product-thumb [name]="row.recipe.name" [imageUrl]="p?.imageUrl ?? null" [category]="p?.category ?? 'other'" class="size-20 shrink-0" />
+        <div class="flex min-w-0 flex-1 flex-col">
+          <p class="truncate font-normal text-ink">{{ row.recipe.name }}</p>
+          <p class="text-xs text-muted">
+            วัตถุดิบ {{ row.recipe.items.length }} อย่าง · ได้ {{ row.recipe.yieldQty }} {{ p?.saleUnit ?? 'ชิ้น' }}/รอบ
+          </p>
+
+          <dl class="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
+            @if (p) {
+              <div class="flex gap-1"><dt class="text-muted">ขาย</dt><dd class="num text-primary-dark">{{ p.sellPrice | baht }}</dd></div>
+              <div class="flex gap-1"><dt class="text-muted">ทุน</dt>
+                <dd class="num">@if (p.costPerPiece !== null) { {{ p.costPerPiece | baht }} } @else { <span class="text-warning">ราคาวัตถุดิบไม่ครบ</span> }</dd>
+              </div>
+              @if (row.profit !== null) {
+                <div class="flex gap-1"><dt class="text-muted">กำไร</dt>
+                  <dd class="num" [class]="row.profit >= 0 ? 'text-success' : 'text-danger'">{{ row.profit | baht }}</dd>
+                </div>
+              }
+            }
+          </dl>
+
+          <div class="mt-auto flex justify-end gap-1 pt-2">
+            <a [routerLink]="['/cost']" [queryParams]="{ recipe: row.recipe.id }" class="btn-ghost min-h-9 px-3 text-xs">
+              <app-icon name="calculator" [size]="16" /> คำนวณ
+            </a>
+            <a [routerLink]="['/recipes', row.recipe.id, 'edit']" class="btn-secondary min-h-9 px-3 text-xs">
+              <app-icon name="pencil" [size]="16" /> แก้ไข
+            </a>
+          </div>
+        </div>
+      </li>
+    }
+  </ul>
+}

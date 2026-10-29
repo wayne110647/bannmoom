@@ -1,0 +1,182 @@
+import { UnitCode } from './domain/units';
+
+/* ---------------- Ingredients & stock ---------------- */
+
+export type IngredientCategory = 'flour' | 'sugar' | 'dairy' | 'egg' | 'chocolate' | 'fruit' | 'packaging' | 'other';
+
+export const INGREDIENT_CATEGORIES: { value: IngredientCategory; label: string }[] = [
+  { value: 'flour', label: 'แป้ง' },
+  { value: 'sugar', label: 'น้ำตาล' },
+  { value: 'dairy', label: 'นม/เนย' },
+  { value: 'egg', label: 'ไข่' },
+  { value: 'chocolate', label: 'ช็อกโกแลต/โกโก้' },
+  { value: 'fruit', label: 'ผลไม้' },
+  { value: 'packaging', label: 'แพ็กเกจ' },
+  { value: 'other', label: 'อื่น ๆ' },
+];
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  category: IngredientCategory;
+  /** Unit all quantities are stored in (g, ml, egg, piece). */
+  baseUnit: UnitCode;
+  /** Unit the shop prefers to see (e.g. kg for flour). Same dimension as baseUnit. */
+  displayUnit: UnitCode;
+  quantityOnHand: number;
+  minQuantity: number;
+  /** Weighted average cost per base unit. null = never purchased. */
+  avgCostPerBaseUnit: number | null;
+  nearestExpiry: string | null;
+  updatedAt: string;
+}
+
+export type StockTxType = 'opening' | 'stock_in' | 'usage' | 'adjustment' | 'sale' | 'sale_reversal';
+
+export const STOCK_TX_LABEL: Record<StockTxType, string> = {
+  opening: 'ยอดยกมา',
+  stock_in: 'รับเข้า',
+  usage: 'เบิกใช้',
+  adjustment: 'ปรับยอด',
+  sale: 'ตัดจากการขาย',
+  sale_reversal: 'คืนจากการยกเลิก',
+};
+
+export interface StockTransaction {
+  id: string;
+  ingredientId: string;
+  type: StockTxType;
+  /** Signed change in base unit (+ in, − out). */
+  quantity: number;
+  unitCost: number | null;
+  balanceAfter: number;
+  reason: string | null;
+  note: string | null;
+  expiryDate: string | null;
+  createdAt: string;
+}
+
+export interface StockInInput {
+  packSize: number;
+  packUnit: UnitCode;
+  packCount: number;
+  pricePerPack: number;
+  expiryDate: string | null;
+  note: string | null;
+}
+
+export interface UsageInput {
+  quantity: number;
+  unit: UnitCode;
+  note: string | null;
+}
+
+export interface AdjustmentInput {
+  /** What was actually counted, in `unit`. */
+  countedQuantity: number;
+  unit: UnitCode;
+  reason: string;
+  note: string | null;
+}
+
+export const ADJUSTMENT_REASONS = ['นับสต็อกจริง', 'ของเสีย/หมดอายุ', 'ชำรุดเสียหาย', 'บันทึกผิดพลาด', 'อื่น ๆ'];
+
+export interface IngredientInput {
+  name: string;
+  category: IngredientCategory;
+  displayUnit: UnitCode;
+  /** In displayUnit. */
+  minQuantity: number;
+}
+
+export interface NewIngredientInput extends IngredientInput {
+  /** Optional opening stock — recorded as an "opening" transaction, never as a bare number. */
+  opening: StockInInput | null;
+}
+
+/* ---------------- Products & recipes ---------------- */
+
+export type ProductCategory = 'cake' | 'cookie' | 'brownie' | 'bread' | 'other';
+
+export const PRODUCT_CATEGORIES: { value: ProductCategory; label: string }[] = [
+  { value: 'cake', label: 'เค้ก' },
+  { value: 'cookie', label: 'คุกกี้' },
+  { value: 'brownie', label: 'บราวนี่' },
+  { value: 'bread', label: 'ขนมปัง' },
+  { value: 'other', label: 'อื่น ๆ' },
+];
+
+export interface Product {
+  id: string;
+  name: string;
+  category: ProductCategory;
+  description: string;
+  imageUrl: string | null;
+  recipeId: string | null;
+  /** ชิ้น / กล่อง / ปอนด์ */
+  saleUnit: string;
+  sellPrice: number;
+  isActive: boolean;
+  /** Calculated from the recipe on the server. null = no recipe or missing ingredient cost. */
+  costPerPiece: number | null;
+}
+
+export interface RecipeItem {
+  ingredientId: string;
+  quantity: number;
+  unit: UnitCode;
+}
+
+export interface Recipe {
+  id: string;
+  name: string;
+  productId: string | null;
+  yieldQty: number;
+  items: RecipeItem[];
+  /** Default extra costs per batch. */
+  packagingCost: number;
+  laborCost: number;
+  otherCost: number;
+}
+
+/** A menu item and its recipe, created/edited together in one form. */
+export interface MenuRecipeInput {
+  name: string;
+  category: ProductCategory;
+  saleUnit: string;
+  sellPrice: number;
+  yieldQty: number;
+  packagingCost: number;
+  laborCost: number;
+  otherCost: number;
+  items: RecipeItem[];
+}
+
+export interface CostCalculationInput {
+  recipeId: string;
+  packagingCost: number;
+  laborCost: number;
+  otherCost: number;
+  yieldQty: number;
+  sellPrice: number | null;
+}
+
+export interface SavedCostCalculation extends CostCalculationInput {
+  id: string;
+  totalCost: number;
+  costPerPiece: number;
+  createdAt: string;
+}
+
+/* ---------------- Dashboard ---------------- */
+
+export interface DashboardSummary {
+  todaySales: number;
+  todaySalesChangePct: number | null;
+  /** Gross profit = sales − cost of goods sold (ingredients + packaging), before other expenses. */
+  estimatedGrossProfit: number;
+  orders: { toHandle: number; pending: number; preparing: number };
+  lowStock: { count: number; names: string[] };
+  expiringSoon: { count: number; names: string[] };
+  bestSellers: { productId: string; name: string; category: ProductCategory; imageUrl: string | null; saleUnit: string; sellPrice: number; qtySold: number }[];
+}

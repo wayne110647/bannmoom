@@ -1,0 +1,195 @@
+<app-page-header title="คำนวณต้นทุน" subtitle="ดูต้นทุนต่อชิ้น แล้วลองตั้งราคาขายเพื่อดูกำไร" />
+
+@let s = data.state();
+@if (s.status === 'loading') {
+  <app-loading [rows]="4" />
+} @else if (s.status === 'error') {
+  <app-error-state [message]="s.message" (retry)="data.reload()" />
+} @else if (s.data.recipes.length === 0) {
+  <app-empty-state icon="book" title="ยังไม่มีสูตรขนม" detail="ต้องมีสูตรก่อน ระบบจึงจะคำนวณต้นทุนให้ได้" />
+} @else {
+  @let res = result();
+  <div class="grid gap-5 lg:grid-cols-3">
+    <!-- ================= Left: inputs ================= -->
+    <div class="space-y-5 lg:col-span-2">
+      <section class="card card-pad">
+        <label class="field">
+          <span class="label">1. เลือกเมนู / สูตร</span>
+          <select class="input" [ngModel]="recipeId()" (ngModelChange)="selectRecipe($event)">
+            @for (r of s.data.recipes; track r.id) { <option [value]="r.id">{{ r.name }}</option> }
+          </select>
+        </label>
+      </section>
+
+      @if (res) {
+        <section class="card">
+          <h2 class="section-title px-4 pt-4 sm:px-5">2. วัตถุดิบที่ใช้ (ต่อ 1 รอบผลิต)</h2>
+
+          <!-- Mobile list -->
+          <ul class="divide-y divide-line md:hidden">
+            @for (l of res.lines; track l.ingredientId) {
+              <li class="flex items-center justify-between gap-3 px-4 py-3">
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-normal">{{ l.name }}</p>
+                  <p class="num text-xs text-muted">{{ l.quantity }} {{ l.unit | unit }}</p>
+                </div>
+                @if (l.cost !== null) {
+                  <span class="num text-sm">{{ l.cost | baht }}</span>
+                } @else {
+                  <span class="badge-warning">{{ l.problem }}</span>
+                }
+              </li>
+            }
+          </ul>
+
+          <!-- Desktop table -->
+          <table class="table hidden md:table">
+            <thead>
+              <tr><th class="pl-5">วัตถุดิบ</th><th class="text-right">ปริมาณ</th><th class="pr-5 text-right">ต้นทุน</th></tr>
+            </thead>
+            <tbody>
+              @for (l of res.lines; track l.ingredientId) {
+                <tr>
+                  <td class="pl-5">{{ l.name }}</td>
+                  <td class="num text-right text-muted">{{ l.quantity }} {{ l.unit | unit }}</td>
+                  <td class="num pr-5 text-right">
+                    @if (l.cost !== null) { {{ l.cost | baht }} } @else { <span class="badge-warning">{{ l.problem }}</span> }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          <div class="flex justify-between border-t border-line px-4 py-3 text-sm font-normal sm:px-5">
+            <span>รวมต้นทุนวัตถุดิบ</span>
+            <span class="num">{{ res.ingredientsTotal | baht }}</span>
+          </div>
+        </section>
+
+        <section class="card card-pad space-y-4">
+          <h2 class="section-title mb-0">3. ค่าใช้จ่ายเพิ่มเติม (ต่อ 1 รอบผลิต)</h2>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <label class="field">
+              <span class="label">บรรจุภัณฑ์ (บาท)</span>
+              <input type="number" inputmode="decimal" min="0" class="input num" [ngModel]="packagingCost()" (ngModelChange)="packagingCost.set($event)" />
+            </label>
+            <label class="field">
+              <span class="label">ค่าแรง (บาท)</span>
+              <input type="number" inputmode="decimal" min="0" class="input num" [ngModel]="laborCost()" (ngModelChange)="laborCost.set($event)" />
+            </label>
+            <label class="field">
+              <span class="label">ค่าแก๊ส/ไฟ/อื่น ๆ (บาท)</span>
+              <input type="number" inputmode="decimal" min="0" class="input num" [ngModel]="otherCost()" (ngModelChange)="otherCost.set($event)" />
+            </label>
+          </div>
+          <label class="field max-w-xs">
+            <span class="label">4. จำนวนที่ผลิตได้ ({{ saleUnit() }})</span>
+            <input type="number" inputmode="numeric" min="1" class="input num" [ngModel]="yieldQty()" (ngModelChange)="yieldQty.set($event)" />
+          </label>
+        </section>
+      }
+    </div>
+
+    <!-- ================= Right: results ================= -->
+    @if (res) {
+      <!-- Phone: live summary pinned above the bottom nav; tap to jump to full results -->
+      <button type="button" (click)="results.scrollIntoView({ behavior: 'smooth', block: 'start' })"
+        class="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 flex items-center gap-3 rounded-2xl bg-primary-dark px-4 py-2.5 text-left text-white shadow-lg lg:hidden">
+        @if (res.complete) {
+          <div class="flex-1">
+            <p class="text-[11px] opacity-75">ต้นทุน/{{ saleUnit() }}</p>
+            <p class="num text-lg font-medium leading-tight">{{ res.perPiece | baht }}</p>
+          </div>
+          <div class="flex-1">
+            <p class="text-[11px] opacity-75">กำไร/{{ saleUnit() }}</p>
+            <p class="num text-lg font-medium leading-tight" [class.text-[#f3b1a9]]="(res.grossProfitPerPiece ?? 0) < 0">
+              {{ res.grossProfitPerPiece !== null ? (res.grossProfitPerPiece | baht) : 'ใส่ราคา' }}
+            </p>
+          </div>
+          @if (res.grossMarginPct !== null) {
+            <span class="num rounded-full bg-white/15 px-2.5 py-1 text-sm">{{ res.grossMarginPct }}%</span>
+          }
+        } @else {
+          <app-icon name="alert" [size]="20" />
+          <p class="flex-1 text-sm">ยังคำนวณไม่ได้ — แตะเพื่อดูสาเหตุ</p>
+        }
+        <app-icon name="chevron-down" [size]="18" class="opacity-75" />
+      </button>
+
+      <aside #results class="scroll-mt-4 space-y-4 pb-16 lg:sticky lg:top-6 lg:self-start lg:pb-0">
+        <section class="card card-pad">
+          <label class="field">
+            <span class="label">5. ราคาขายต่อ{{ saleUnit() }} (บาท)</span>
+            <input type="number" inputmode="decimal" min="0" class="input num text-xl font-medium" [ngModel]="sellPrice()" (ngModelChange)="sellPrice.set($event)" placeholder="0.00" />
+          </label>
+          @if (res.complete) {
+            <div class="mt-3">
+              <p class="hint mb-1.5">หรือให้ระบบตั้งราคาจากกำไรที่ต้องการ</p>
+              <div class="flex flex-wrap gap-1.5">
+                @for (m of marginPresets; track m) {
+                  <button type="button" class="chip min-h-8 px-3 text-xs" (click)="applyMargin(m)">กำไร {{ m }}%</button>
+                }
+              </div>
+            </div>
+          }
+        </section>
+
+        @if (!res.complete) {
+          <section class="card card-pad border-warning/40 bg-warning/5" role="alert">
+            <p class="mb-2 flex items-center gap-2 font-normal text-[#8a5a1c]"><app-icon name="alert" [size]="18" /> ยังคำนวณต้นทุนไม่ได้</p>
+            <ul class="list-disc space-y-1 pl-5 text-sm text-ink">
+              @for (p of res.problems; track p) { <li>{{ p }}</li> }
+            </ul>
+            <a routerLink="/stock" class="btn-secondary mt-3 w-full">ไปบันทึกราคาวัตถุดิบ</a>
+          </section>
+        } @else {
+          <section class="card card-pad space-y-2.5">
+            <div class="flex justify-between text-sm"><span class="text-muted">ต้นทุนรวมทั้งรอบ</span><span class="num">{{ res.total | baht }}</span></div>
+            <div class="flex items-baseline justify-between border-t border-line pt-2.5">
+              <span class="text-sm">ต้นทุนต่อ{{ saleUnit() }}</span>
+              <span class="num text-2xl font-medium text-primary-dark">{{ res.perPiece | baht }}</span>
+            </div>
+
+            @if (res.grossProfitPerPiece !== null) {
+              <div class="flex items-baseline justify-between">
+                <span class="text-sm">กำไรต่อ{{ saleUnit() }}</span>
+                <span class="num text-xl font-medium" [class]="res.grossProfitPerPiece >= 0 ? 'text-success' : 'text-danger'">{{ res.grossProfitPerPiece | baht }}</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <div class="rounded-xl bg-soft/70 p-2.5 text-center">
+                  <p class="num text-lg font-medium" [class]="res.grossMarginPct! >= 0 ? 'text-success' : 'text-danger'">{{ res.grossMarginPct }}%</p>
+                  <p class="text-[11px] text-muted">อัตรากำไรจากราคาขาย</p>
+                </div>
+                <div class="rounded-xl bg-soft/70 p-2.5 text-center">
+                  <p class="num text-lg font-medium text-primary-dark">{{ res.markupPct ?? '—' }}%</p>
+                  <p class="text-[11px] text-muted">บวกเพิ่มจากต้นทุน</p>
+                </div>
+              </div>
+              <div class="flex justify-between text-sm"><span class="text-muted">กำไรทั้งรอบ ({{ yieldQty() }} {{ saleUnit() }})</span><span class="num">{{ res.profitPerBatch | baht }}</span></div>
+              @if (res.grossProfitPerPiece < 0) {
+                <p class="rounded-xl bg-danger/10 p-2.5 text-sm text-danger">ราคานี้ขาดทุน ลองปรับราคาขายขึ้น</p>
+              }
+            } @else {
+              <p class="text-sm text-muted">ใส่ราคาขายเพื่อดูกำไร</p>
+            }
+          </section>
+
+          <button type="button" class="btn-primary btn-block" [disabled]="saving()" (click)="save()">
+            @if (saving()) { กำลังบันทึก... } @else { <app-icon name="save" [size]="18" /> บันทึกผลการคำนวณ }
+          </button>
+        }
+
+        <details class="card card-pad text-sm text-muted">
+          <summary class="cursor-pointer text-primary-dark">ตัวเลขเหล่านี้คิดอย่างไร?</summary>
+          <ul class="mt-2 space-y-1.5">
+            <li><b class="font-normal text-ink">ต้นทุนวัตถุดิบ</b> = ปริมาณที่ใช้ × ต้นทุนเฉลี่ยของวัตถุดิบ</li>
+            <li><b class="font-normal text-ink">ต้นทุนต่อชิ้น</b> = (วัตถุดิบ + บรรจุภัณฑ์ + ค่าแรง + อื่น ๆ) ÷ จำนวนที่ผลิตได้</li>
+            <li><b class="font-normal text-ink">อัตรากำไรจากราคาขาย</b> = กำไร ÷ ราคาขาย × 100 — เช่น ขาย 100 บาท กำไร 40 บาท = 40%</li>
+            <li><b class="font-normal text-ink">บวกเพิ่มจากต้นทุน</b> = กำไร ÷ ต้นทุน × 100 — ทุน 60 บาท ขาย 100 บาท = บวกเพิ่ม 66.67%</li>
+            <li>เป็น <b class="font-normal text-ink">กำไรขั้นต้น</b> ยังไม่หักค่าเช่า ค่าส่ง หรือค่าใช้จ่ายประจำอื่นของร้าน</li>
+          </ul>
+        </details>
+      </aside>
+    }
+  </div>
+}

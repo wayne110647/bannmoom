@@ -1,0 +1,90 @@
+@let s = detail.state();
+@if (s.status === 'loading') {
+  <app-page-header title="วัตถุดิบ" backLink="/stock" />
+  <app-loading [rows]="4" />
+} @else if (s.status === 'error') {
+  <app-page-header title="วัตถุดิบ" backLink="/stock" />
+  <app-error-state [message]="s.message" (retry)="detail.reload()" />
+} @else {
+  @let ing = s.data.ingredient;
+  <app-page-header [title]="ing.name" [subtitle]="categoryLabel[ing.category]" backLink="/stock">
+    <a [routerLink]="['/stock', ing.id, 'edit']" class="btn-secondary" aria-label="แก้ไขข้อมูลวัตถุดิบ">
+      <app-icon name="pencil" [size]="18" /> <span class="hidden sm:inline">แก้ไข</span>
+    </a>
+  </app-page-header>
+
+  <div class="grid gap-5 lg:grid-cols-3">
+    <div class="space-y-5">
+      <!-- Balance -->
+      <section class="card card-pad">
+        <p class="text-sm text-muted">คงเหลือ</p>
+        <p class="num mt-1 text-4xl font-medium text-primary-dark">
+          {{ ing.quantityOnHand | qty: ing.baseUnit : ing.displayUnit : false }}
+          <span class="text-lg font-normal">{{ ing.displayUnit | unit: true }}</span>
+        </p>
+        <app-ingredient-badges [ingredient]="ing" class="mt-2" />
+
+        <dl class="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4 text-sm">
+          <div>
+            <dt class="text-xs text-muted">จำนวนขั้นต่ำ</dt>
+            <dd class="num">{{ ing.minQuantity | qty: ing.baseUnit : ing.displayUnit }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted">ต้นทุนเฉลี่ย</dt>
+            <dd class="num">
+              @if (ing.avgCostPerBaseUnit !== null) { {{ ing.avgCostPerBaseUnit | unitCost: ing.baseUnit : ing.displayUnit }} }
+              @else { <span class="text-warning">ยังไม่มีราคา</span> }
+            </dd>
+          </div>
+          <div class="col-span-2">
+            <dt class="text-xs text-muted">วันหมดอายุที่ใกล้ที่สุด</dt>
+            <dd>{{ ing.nearestExpiry | thDate }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- Actions -->
+      <section class="grid grid-cols-3 gap-2">
+        <a [routerLink]="['/stock', ing.id, 'move', 'in']" class="card flex flex-col items-center gap-1.5 py-4 text-sm text-success hover:border-success">
+          <app-icon name="stock-in" [size]="24" /> รับเข้า
+        </a>
+        <a [routerLink]="['/stock', ing.id, 'move', 'use']" class="card flex flex-col items-center gap-1.5 py-4 text-sm text-primary hover:border-secondary">
+          <app-icon name="stock-out" [size]="24" /> เบิกใช้
+        </a>
+        <a [routerLink]="['/stock', ing.id, 'move', 'adjust']" class="card flex flex-col items-center gap-1.5 py-4 text-sm text-warning hover:border-warning">
+          <app-icon name="sliders" [size]="24" /> ปรับยอด
+        </a>
+      </section>
+    </div>
+
+    <!-- History -->
+    <section class="lg:col-span-2">
+      <h2 class="section-title flex items-center gap-2"><app-icon name="history" [size]="18" /> ประวัติการเคลื่อนไหว</h2>
+      @if (s.data.history.length === 0) {
+        <app-empty-state icon="history" title="ยังไม่มีประวัติ" detail="เมื่อรับเข้าหรือเบิกใช้ ระบบจะบันทึกไว้ที่นี่" />
+      } @else {
+        <ul class="card divide-y divide-line">
+          @for (tx of s.data.history; track tx.id) {
+            <li class="flex items-start gap-3 p-3.5">
+              <span class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full"
+                [class]="tx.quantity >= 0 ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'">
+                <app-icon [name]="txIcon[tx.type]" [size]="18" />
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-normal">{{ txLabel[tx.type] }}@if (tx.reason) { <span class="text-muted"> · {{ tx.reason }}</span> }</p>
+                <p class="text-xs text-muted">{{ tx.createdAt | thDate: true }}@if (tx.expiryDate && tx.quantity > 0) { · หมดอายุ {{ tx.expiryDate | thDate }} }</p>
+                @if (tx.note) { <p class="mt-0.5 text-xs text-muted">{{ tx.note }}</p> }
+              </div>
+              <div class="text-right">
+                <p class="num text-sm font-medium" [class]="tx.quantity >= 0 ? 'text-success' : 'text-danger'">
+                  {{ tx.quantity >= 0 ? '+' : '−' }}{{ (tx.quantity < 0 ? -tx.quantity : tx.quantity) | qty: ing.baseUnit : ing.displayUnit }}
+                </p>
+                <p class="num text-xs text-muted">เหลือ {{ tx.balanceAfter | qty: ing.baseUnit : ing.displayUnit }}</p>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  </div>
+}
