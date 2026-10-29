@@ -1,10 +1,17 @@
 import { ChangeDetectionStrategy, Component, Injectable, inject, signal } from '@angular/core';
 import { Icon } from './icon';
 
+/** A button inside the toast, e.g. "เลิกทำ" after a delete. */
+export interface ToastAction {
+  label: string;
+  run: () => void;
+}
+
 interface Toast {
   id: number;
   kind: 'success' | 'error';
   text: string;
+  action?: ToastAction;
 }
 
 /** Short feedback messages. Call success() only after the API has confirmed the save. */
@@ -13,17 +20,23 @@ export class ToastService {
   readonly toasts = signal<Toast[]>([]);
   private nextId = 1;
 
-  success(text: string) { this.show('success', text); }
+  /** With an action (undo), the toast stays longer so there is time to tap it. */
+  success(text: string, action?: ToastAction) { this.show('success', text, action); }
   error(text: string) { this.show('error', text); }
 
   dismiss(id: number) {
     this.toasts.update((list) => list.filter((t) => t.id !== id));
   }
 
-  private show(kind: Toast['kind'], text: string) {
+  runAction(t: Toast) {
+    this.dismiss(t.id);
+    t.action?.run();
+  }
+
+  private show(kind: Toast['kind'], text: string, action?: ToastAction) {
     const id = this.nextId++;
-    this.toasts.update((list) => [...list, { id, kind, text }]);
-    setTimeout(() => this.dismiss(id), kind === 'error' ? 6000 : 3000);
+    this.toasts.update((list) => [...list, { id, kind, text, action }]);
+    setTimeout(() => this.dismiss(id), kind === 'error' || action ? 7000 : 3000);
   }
 }
 
@@ -39,6 +52,11 @@ export class ToastService {
         [class.bg-success]="t.kind === 'success'" [class.bg-danger]="t.kind === 'error'">
         <app-icon [name]="t.kind === 'success' ? 'check' : 'alert'" />
         <span class="flex-1">{{ t.text }}</span>
+        @if (t.action) {
+          <button type="button" class="-my-1 min-h-9 rounded-xl bg-white/20 px-3.5 font-medium hover:bg-white/30" (click)="toast.runAction(t)">
+            {{ t.action.label }}
+          </button>
+        }
         <button type="button" class="-mr-1 p-1 opacity-80 hover:opacity-100" (click)="toast.dismiss(t.id)" aria-label="ปิด">
           <app-icon name="x" [size]="16" />
         </button>

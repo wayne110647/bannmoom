@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS ingredients (
   id                     text PRIMARY KEY,
-  name                   text NOT NULL UNIQUE CHECK (char_length(name) BETWEEN 1 AND 80),
+  name                   text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 80),
   category               text NOT NULL,
   base_unit              text NOT NULL CHECK (base_unit IN ('g', 'ml', 'egg', 'piece')),
   display_unit           text NOT NULL,
@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS ingredients (
   min_quantity           numeric(18, 6) NOT NULL DEFAULT 0 CHECK (min_quantity >= 0),
   avg_cost_per_base_unit numeric(18, 6) CHECK (avg_cost_per_base_unit >= 0),
   nearest_expiry         date,
-  updated_at             timestamptz NOT NULL DEFAULT now()
+  updated_at             timestamptz NOT NULL DEFAULT now(),
+  -- Deleting only archives: stock history keeps pointing at the row, and undo can bring it back.
+  archived_at            timestamptz
 );
 
 -- Every stock change is a row here; quantity_on_hand is never edited without one.
@@ -40,19 +42,21 @@ CREATE TABLE IF NOT EXISTS products (
   sale_unit   text NOT NULL CHECK (char_length(sale_unit) BETWEEN 1 AND 20),
   sell_price  numeric(12, 2) NOT NULL CHECK (sell_price >= 0),
   is_active   boolean NOT NULL DEFAULT true,
-  created_at  timestamptz NOT NULL DEFAULT now()
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  archived_at timestamptz
 );
 
 -- A recipe belongs to at most one product; products.recipeId is derived from this link.
 CREATE TABLE IF NOT EXISTS recipes (
   id             text PRIMARY KEY,
-  name           text NOT NULL UNIQUE CHECK (char_length(name) BETWEEN 1 AND 80),
+  name           text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 80),
   product_id     text UNIQUE REFERENCES products (id),
   yield_qty      numeric(12, 3) NOT NULL CHECK (yield_qty > 0),
   packaging_cost numeric(12, 2) NOT NULL DEFAULT 0 CHECK (packaging_cost >= 0),
   labor_cost     numeric(12, 2) NOT NULL DEFAULT 0 CHECK (labor_cost >= 0),
   other_cost     numeric(12, 2) NOT NULL DEFAULT 0 CHECK (other_cost >= 0),
-  created_at     timestamptz NOT NULL DEFAULT now()
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  archived_at    timestamptz
 );
 
 CREATE TABLE IF NOT EXISTS recipe_items (
@@ -76,3 +80,15 @@ CREATE TABLE IF NOT EXISTS cost_calculations (
   cost_per_piece numeric(12, 2) NOT NULL,
   created_at     timestamptz NOT NULL DEFAULT now()
 );
+
+-- ---------- Archive (soft delete) ----------
+-- Brings databases created before archiving existed up to date; no-ops on fresh ones.
+ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+ALTER TABLE ingredients DROP CONSTRAINT IF EXISTS ingredients_name_key;
+ALTER TABLE recipes DROP CONSTRAINT IF EXISTS recipes_name_key;
+
+-- Names only need to be unique among items that are still in use, so a deleted name can be reused.
+CREATE UNIQUE INDEX IF NOT EXISTS ingredients_name_active_key ON ingredients (name) WHERE archived_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS recipes_name_active_key ON recipes (name) WHERE archived_at IS NULL;

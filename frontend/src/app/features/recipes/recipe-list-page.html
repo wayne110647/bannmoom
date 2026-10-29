@@ -17,10 +17,14 @@
   <ul class="grid gap-3 md:grid-cols-2">
     @for (row of rows(); track row.recipe.id) {
       @let p = row.product;
-      <li class="card flex gap-3 p-3">
+      <li class="card relative flex gap-3 p-3" (appLongPress)="openMenu(row, $event)">
+        <button type="button" class="icon-btn absolute top-1.5 right-1.5 text-muted" [attr.aria-label]="'ตัวเลือกของ ' + row.recipe.name"
+          (click)="openMenu(row, anchorBelow($event))">
+          <app-icon name="more" [size]="22" />
+        </button>
         <app-product-thumb [name]="row.recipe.name" [imageUrl]="p?.imageUrl ?? null" [category]="p?.category ?? 'other'" class="size-20 shrink-0" />
         <div class="flex min-w-0 flex-1 flex-col">
-          <p class="truncate font-normal text-ink">{{ row.recipe.name }}</p>
+          <p class="truncate pr-9 font-normal text-ink">{{ row.recipe.name }}</p>
           <p class="text-xs text-muted">
             วัตถุดิบ {{ row.recipe.items.length }} อย่าง · ได้ {{ row.recipe.yieldQty }} {{ p?.saleUnit ?? 'ชิ้น' }}/รอบ
           </p>

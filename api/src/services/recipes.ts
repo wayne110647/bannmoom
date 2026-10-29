@@ -18,7 +18,8 @@ const RECIPE_SELECT = `
                     ORDER BY i.position) FILTER (WHERE i.recipe_id IS NOT NULL),
            '[]'
          ) AS items
-  FROM recipes r LEFT JOIN recipe_items i ON i.recipe_id = r.id`;
+  FROM recipes r LEFT JOIN recipe_items i ON i.recipe_id = r.id
+  WHERE r.archived_at IS NULL`;
 
 /* ---------------- Recipes ---------------- */
 
@@ -28,7 +29,7 @@ export async function listRecipes(sql: Sql): Promise<Recipe[]> {
 }
 
 export async function getRecipe(sql: Sql, id: string): Promise<Recipe> {
-  const [row] = await sql.query<Recipe>(`${RECIPE_SELECT} WHERE r.id = $1 GROUP BY r.id`, [id]);
+  const [row] = await sql.query<Recipe>(`${RECIPE_SELECT} AND r.id = $1 GROUP BY r.id`, [id]);
   if (!row) throw notFound('ไม่พบสูตรนี้');
   return row;
 }
@@ -55,7 +56,7 @@ export async function updateRecipe(db: Db, id: string, input: MenuRecipeInput): 
   return saveRecipe(db, input, async (tx) => {
     const [row] = await tx.query<{ productId: string | null }>(
       `UPDATE recipes SET name = $2, yield_qty = $3, packaging_cost = $4, labor_cost = $5, other_cost = $6
-       WHERE id = $1 RETURNING product_id AS "productId"`,
+       WHERE id = $1 AND archived_at IS NULL RETURNING product_id AS "productId"`,
       [id, input.name, input.yieldQty, input.packagingCost, input.laborCost, input.otherCost],
     );
     if (!row) throw notFound('ไม่พบสูตรนี้');
@@ -85,7 +86,7 @@ async function saveRecipe(db: Db, input: MenuRecipeInput, writeHeader: (tx: Sql)
       return getRecipe(tx, recipeId);
     });
   } catch (e) {
-    if (isUniqueViolation(e, 'recipes_name_key')) throw conflict(`มีเมนูชื่อ "${input.name}" อยู่แล้ว`);
+    if (isUniqueViolation(e, 'recipes_name_active_key')) throw conflict(`มีเมนูชื่อ "${input.name}" อยู่แล้ว`);
     throw e;
   }
 }
@@ -93,7 +94,7 @@ async function saveRecipe(db: Db, input: MenuRecipeInput, writeHeader: (tx: Sql)
 async function checkItems(tx: Sql, input: MenuRecipeInput) {
   const ids = input.items.map((i) => i.ingredientId);
   const found = await tx.query<{ id: string; name: string; baseUnit: Ingredient['baseUnit'] }>(
-    `SELECT id, name, base_unit AS "baseUnit" FROM ingredients WHERE id = ANY($1)`,
+    `SELECT id, name, base_unit AS "baseUnit" FROM ingredients WHERE id = ANY($1) AND archived_at IS NULL`,
     [ids],
   );
   const byId = new Map(found.map((i) => [i.id, i]));
@@ -104,6 +105,38 @@ async function checkItems(tx: Sql, input: MenuRecipeInput) {
     if (seen.has(ing.id)) throw badRequest(`ใส่ "${ing.name}" ซ้ำ — รวมเป็นบรรทัดเดียว`);
     seen.add(ing.id);
     if (!isCompatible(item.unit, ing.baseUnit)) throw badRequest(`หน่วยของ "${ing.name}" ไม่ถูกต้อง`);
+  }
+}
+
+/* ---------------- Delete (archive) menu items ---------------- */
+
+/** Archives the menu item together with its recipe; undo brings both back. */
+export function archiveProduct(db: Db, id: string): Promise<void> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.query(
+      `UPDATE products SET archived_at = now() WHERE id = $1 AND archived_at IS NULL RETURNING id`,
+      [id],
+    );
+    if (!row) throw notFound('ไม่พบเมนูนี้ อาจถูกลบไปแล้ว');
+    await tx.query(`UPDATE recipes SET archived_at = now() WHERE product_id = $1 AND archived_at IS NULL`, [id]);
+  });
+}
+
+export async function restoreProduct(db: Db, id: string): Promise<void> {
+  try {
+    await db.transaction(async (tx) => {
+      const [row] = await tx.query(
+        `UPDATE products SET archived_at = NULL WHERE id = $1 AND archived_at IS NOT NULL RETURNING id`,
+        [id],
+      );
+      if (!row) throw notFound('ไม่พบเมนูที่ลบไป');
+      await tx.query(`UPDATE recipes SET archived_at = NULL WHERE product_id = $1`, [id]);
+    });
+  } catch (e) {
+    if (isUniqueViolation(e, 'recipes_name_active_key')) {
+      throw conflict('กู้คืนไม่ได้ เพราะมีเมนูชื่อเดียวกันเพิ่มเข้ามาแล้ว');
+    }
+    throw e;
   }
 }
 
@@ -139,6 +172,7 @@ export async function listProducts(sql: Sql): Promise<Product[]> {
       `SELECT p.id, p.name, p.category, p.description, p.image_url AS "imageUrl", r.id AS "recipeId",
               p.sale_unit AS "saleUnit", p.sell_price AS "sellPrice", p.is_active AS "isActive"
        FROM products p LEFT JOIN recipes r ON r.product_id = p.id
+       WHERE p.archived_at IS NULL
        ORDER BY p.created_at`,
     ),
     listRecipes(sql),

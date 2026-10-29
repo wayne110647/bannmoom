@@ -6,13 +6,14 @@ import { BRAND } from '../core/brand';
 import { usingMockData } from '../core/data/data-providers';
 import { OnlineStatus } from '../core/online-status';
 import { Icon } from '../shared/icon';
+import { ActionSheet } from '../shared/action-sheet';
 import { Toasts } from '../shared/toast';
 import { MAIN_NAV, MORE_NAV, SIDEBAR_LABEL } from './nav';
 
 @Component({
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, Toasts],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, Toasts, ActionSheet],
   templateUrl: './shell.html',
 })
 export class Shell {

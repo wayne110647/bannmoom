@@ -10,6 +10,8 @@ export type LoadState<T> =
 export interface Loader<T> {
   state: Signal<LoadState<T>>;
   reload(): void;
+  /** Change loaded data in place (e.g. drop a deleted row) without showing the loading skeleton again. */
+  update(fn: (data: T) => T): void;
 }
 
 /**
@@ -29,7 +31,10 @@ export function createLoader<T>(source: () => Observable<T>): Loader<T> {
     });
   };
 
+  const update = (fn: (data: T) => T) =>
+    state.update((s) => (s.status === 'ready' ? { status: 'ready', data: fn(s.data) } : s));
+
   inject(DestroyRef).onDestroy(() => sub?.unsubscribe());
   reload();
-  return { state: state.asReadonly(), reload };
+  return { state: state.asReadonly(), reload, update };
 }

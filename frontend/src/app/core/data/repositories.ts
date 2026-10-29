@@ -19,10 +19,17 @@ export abstract class IngredientRepository {
   abstract stockIn(id: string, input: StockInInput): Observable<Ingredient>;
   abstract usage(id: string, input: UsageInput): Observable<Ingredient>;
   abstract adjust(id: string, input: AdjustmentInput): Observable<Ingredient>;
+  /** Archives it (history kept). Fails with a clear message while a menu still uses it. */
+  abstract remove(id: string): Observable<void>;
+  /** Undo for remove(). */
+  abstract restore(id: string): Observable<Ingredient>;
 }
 
 export abstract class ProductRepository {
   abstract list(): Observable<Product[]>;
+  /** Deletes the menu item together with its recipe (archived, so restore() can undo it). */
+  abstract remove(id: string): Observable<void>;
+  abstract restore(id: string): Observable<void>;
 }
 
 export abstract class RecipeRepository {

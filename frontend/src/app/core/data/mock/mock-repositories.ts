@@ -45,6 +45,8 @@ export class MockDb {
   recipes: Recipe[] = structuredClone(SEED_RECIPES);
   products = structuredClone(SEED_PRODUCTS);
   calculations: SavedCostCalculation[] = [];
+  /** Deleted items wait here so undo can put them back, like the API's archived rows. */
+  archived = { ingredients: [] as Ingredient[], products: [] as typeof SEED_PRODUCTS, recipes: [] as Recipe[] };
 
   ingredient(id: string): Ingredient {
     const found = this.ingredients.find((i) => i.id === id);
@@ -182,6 +184,31 @@ export class MockIngredientRepository extends IngredientRepository {
       return ing;
     });
   }
+
+  remove(id: string) {
+    return respond<void>(() => {
+      const ing = this.db.ingredient(id);
+      const usedBy = this.db.recipes.filter((r) => r.items.some((i) => i.ingredientId === id));
+      if (usedBy.length) {
+        throw new AppError(`ยังใช้อยู่ในเมนู ${usedBy.map((r) => `"${r.name}"`).join(', ')} — เอาออกจากสูตรก่อนแล้วค่อยลบ`);
+      }
+      this.db.ingredients = this.db.ingredients.filter((i) => i !== ing);
+      this.db.archived.ingredients.push(ing);
+    });
+  }
+
+  restore(id: string) {
+    return respond(() => {
+      const ing = this.db.archived.ingredients.find((i) => i.id === id);
+      if (!ing) throw new AppError('ไม่พบวัตถุดิบที่ลบไป');
+      if (this.db.ingredients.some((i) => i.name === ing.name)) {
+        throw new AppError('กู้คืนไม่ได้ เพราะมีวัตถุดิบชื่อเดียวกันเพิ่มเข้ามาแล้ว');
+      }
+      this.db.archived.ingredients = this.db.archived.ingredients.filter((i) => i !== ing);
+      this.db.ingredients.push(ing);
+      return ing;
+    });
+  }
 }
 
 @Injectable()
@@ -192,6 +219,37 @@ export class MockProductRepository extends ProductRepository {
     return respond<Product[]>(() =>
       this.db.products.map((p) => ({ ...p, costPerPiece: this.db.productCost(p.recipeId) })),
     );
+  }
+
+  remove(id: string) {
+    return respond<void>(() => {
+      const product = this.db.products.find((p) => p.id === id);
+      if (!product) throw new AppError('ไม่พบเมนูนี้ อาจถูกลบไปแล้ว');
+      const recipe = this.db.recipes.find((r) => r.productId === id);
+      this.db.products = this.db.products.filter((p) => p !== product);
+      this.db.archived.products.push(product);
+      if (recipe) {
+        this.db.recipes = this.db.recipes.filter((r) => r !== recipe);
+        this.db.archived.recipes.push(recipe);
+      }
+    });
+  }
+
+  restore(id: string) {
+    return respond<void>(() => {
+      const product = this.db.archived.products.find((p) => p.id === id);
+      if (!product) throw new AppError('ไม่พบเมนูที่ลบไป');
+      const recipe = this.db.archived.recipes.find((r) => r.productId === id);
+      if (recipe && this.db.recipes.some((r) => r.name === recipe.name)) {
+        throw new AppError('กู้คืนไม่ได้ เพราะมีเมนูชื่อเดียวกันเพิ่มเข้ามาแล้ว');
+      }
+      this.db.archived.products = this.db.archived.products.filter((p) => p !== product);
+      this.db.products.push(product);
+      if (recipe) {
+        this.db.archived.recipes = this.db.archived.recipes.filter((r) => r !== recipe);
+        this.db.recipes.push(recipe);
+      }
+    });
   }
 }
 

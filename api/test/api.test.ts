@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
@@ -7,7 +8,7 @@ import { Db, TYPE_PARSERS } from '../src/db';
 /** Real Postgres (PGlite, in-process) with the real schema, fresh for every test. */
 async function setup() {
   const pg = await PGlite.create({ parsers: TYPE_PARSERS });
-  await pg.exec(await readFile(new URL('../db/schema.sql', import.meta.url), 'utf8'));
+  await pg.exec(await readFile(fileURLToPath(new URL('../db/schema.sql', import.meta.url).href), 'utf8'));
   const db: Db = {
     query: async (text, values) => (await pg.query<any>(text, values)).rows,
     transaction: (fn) => pg.transaction((tx) => fn({ query: async (text, values) => (await tx.query<any>(text, values)).rows })),
@@ -19,7 +20,8 @@ async function setup() {
       headers: body === undefined ? {} : { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    return { status: res.status, json: (await res.json()) as any };
+    const text = await res.text();
+    return { status: res.status, json: (text ? JSON.parse(text) : null) as any };
   };
   return { call, pg };
 }
@@ -165,6 +167,45 @@ describe('recipes, menu & cost', () => {
     expect(res.status).toBe(201);
     // 44 + 26 = 70 → ÷ 12 = 5.833…
     expect(res.json).toMatchObject({ totalCost: 70, costPerPiece: 5.83 });
+  });
+
+  it('deletes a menu item with its recipe, frees the name, and undo brings it back', async () => {
+    const { json: r } = await call('POST', '/recipes', cookie());
+    const productId = r.productId;
+    expect((await call('DELETE', `/products/${productId}`)).status).toBe(204);
+    expect((await call('GET', '/products')).json).toHaveLength(0);
+    expect((await call('GET', '/recipes')).json).toHaveLength(0);
+    expect((await call('GET', `/recipes/${r.id}`)).status).toBe(404);
+
+    expect((await call('POST', `/products/${productId}/restore`)).status).toBe(204);
+    expect((await call('GET', '/products')).json[0]).toMatchObject({ id: productId, recipeId: r.id, costPerPiece: 5.4 });
+
+    // Once deleted again, the same name can be used for a new menu — and then the old one can't come back.
+    await call('DELETE', `/products/${productId}`);
+    expect((await call('POST', '/recipes', cookie())).status).toBe(201);
+    const blocked = await call('POST', `/products/${productId}/restore`);
+    expect(blocked.status).toBe(409);
+    expect(blocked.json.message).toContain('ชื่อเดียวกัน');
+  });
+
+  it('will not delete an ingredient a menu still uses, and says which menu', async () => {
+    await call('POST', '/recipes', cookie());
+    const res = await call('DELETE', `/ingredients/${butter.id}`);
+    expect(res.status).toBe(409);
+    expect(res.json.message).toContain('"คุกกี้เนยสด"');
+    expect((await call('GET', `/ingredients/${butter.id}`)).status).toBe(200);
+  });
+
+  it('deletes an unused ingredient but keeps its history for undo', async () => {
+    expect((await call('DELETE', `/ingredients/${flour.id}`)).status).toBe(204);
+    expect((await call('GET', '/ingredients')).json.map((i: any) => i.name)).not.toContain('แป้ง');
+    expect((await call('GET', `/ingredients/${flour.id}`)).status).toBe(404);
+    // A deleted ingredient can't be put into a recipe.
+    expect((await call('POST', '/recipes', cookie())).status).toBe(400);
+
+    const restored = await call('POST', `/ingredients/${flour.id}/restore`);
+    expect(restored.json).toMatchObject({ name: 'แป้ง', quantityOnHand: 1000, avgCostPerBaseUnit: 0.032 });
+    expect((await call('GET', `/ingredients/${flour.id}/transactions`)).json).toHaveLength(1);
   });
 
   it('summarises low stock without inventing sales figures', async () => {

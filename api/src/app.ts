@@ -3,11 +3,12 @@ import { z } from 'zod';
 import { Db, DbHandle } from './db';
 import { ApiError } from './errors';
 import {
-  createIngredient, getIngredient, listIngredients, listTransactions, recordAdjustment, recordUsage, stockIn,
-  updateIngredient,
+  archiveIngredient, createIngredient, getIngredient, listIngredients, listTransactions, recordAdjustment, recordUsage, stockIn,
+  restoreIngredient, updateIngredient,
 } from './services/ingredients';
 import {
-  createRecipe, dashboardSummary, getRecipe, listProducts, listRecipes, saveCostCalculation, updateRecipe,
+  archiveProduct, createRecipe, dashboardSummary, getRecipe, listProducts, listRecipes, restoreProduct,
+  saveCostCalculation, updateRecipe,
 } from './services/recipes';
 import {
   adjustmentSchema, costCalculationSchema, ingredientSchema, menuRecipeSchema, newIngredientSchema, stockInSchema,
@@ -61,6 +62,11 @@ export function createApp(openDb: (env: Bindings) => Promise<DbHandle>) {
   app.put('/ingredients/:id', async (c) =>
     c.json(await updateIngredient(c.var.db, c.req.param('id'), await body(c, ingredientSchema))),
   );
+  app.delete('/ingredients/:id', async (c) => {
+    await archiveIngredient(c.var.db, c.req.param('id'));
+    return c.body(null, 204);
+  });
+  app.post('/ingredients/:id/restore', async (c) => c.json(await restoreIngredient(c.var.db, c.req.param('id'))));
   app.get('/ingredients/:id/transactions', async (c) => c.json(await listTransactions(c.var.db, c.req.param('id'))));
   app.post('/ingredients/:id/stock-in', async (c) =>
     c.json(await stockIn(c.var.db, c.req.param('id'), await body(c, stockInSchema))),
@@ -74,6 +80,15 @@ export function createApp(openDb: (env: Bindings) => Promise<DbHandle>) {
 
   /* ---------- Menu & recipes ---------- */
   app.get('/products', async (c) => c.json(await listProducts(c.var.db)));
+  /** Deletes the menu item and its recipe (archived, so undo works). */
+  app.delete('/products/:id', async (c) => {
+    await archiveProduct(c.var.db, c.req.param('id'));
+    return c.body(null, 204);
+  });
+  app.post('/products/:id/restore', async (c) => {
+    await restoreProduct(c.var.db, c.req.param('id'));
+    return c.body(null, 204);
+  });
   app.get('/recipes', async (c) => c.json(await listRecipes(c.var.db)));
   app.post('/recipes', async (c) => c.json(await createRecipe(c.var.db, await body(c, menuRecipeSchema)), 201));
   app.get('/recipes/:id', async (c) => c.json(await getRecipe(c.var.db, c.req.param('id'))));

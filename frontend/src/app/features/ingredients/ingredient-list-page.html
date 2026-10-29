@@ -40,8 +40,9 @@
   <!-- Phone/tablet: cards -->
   <ul class="grid gap-2.5 pb-12 sm:grid-cols-2 lg:hidden">
     @for (ing of visible(); track ing.id) {
-      <li>
-        <a [routerLink]="['/stock', ing.id]" class="card flex h-full items-center gap-3 p-3.5 active:bg-soft/50">
+      <li class="relative">
+        <a [routerLink]="['/stock', ing.id]" (appLongPress)="openMenu(ing, $event)"
+          class="card flex h-full items-center gap-3 py-3.5 pr-14 pl-3.5 active:bg-soft/50">
           <div class="min-w-0 flex-1">
             <p class="truncate font-normal">{{ ing.name }}</p>
             <p class="text-xs text-muted">{{ categoryLabel[ing.category] }} · ขั้นต่ำ {{ ing.minQuantity | qty: ing.baseUnit : ing.displayUnit }}</p>
@@ -51,8 +52,11 @@
             <p class="num text-lg font-medium text-primary-dark">{{ ing.quantityOnHand | qty: ing.baseUnit : ing.displayUnit : false }}</p>
             <p class="text-xs text-muted">{{ ing.displayUnit | unit: true }}</p>
           </div>
-          <app-icon name="chevron-right" [size]="18" class="text-muted" />
         </a>
+        <button type="button" class="icon-btn absolute top-1/2 right-1.5 -translate-y-1/2 text-muted"
+          [attr.aria-label]="'ตัวเลือกของ ' + ing.name" (click)="openMenu(ing, anchorBelow($event))">
+          <app-icon name="more" [size]="22" />
+        </button>
       </li>
     }
   </ul>
@@ -73,7 +77,7 @@
       </thead>
       <tbody>
         @for (ing of visible(); track ing.id) {
-          <tr class="cursor-pointer hover:bg-soft/40" [routerLink]="['/stock', ing.id]">
+          <tr class="cursor-pointer hover:bg-soft/40" [routerLink]="['/stock', ing.id]" (appLongPress)="openMenu(ing, $event)">
             <td class="font-normal">{{ ing.name }}</td>
             <td class="whitespace-nowrap text-muted">{{ categoryLabel[ing.category] }}</td>
             <td class="num text-right font-medium whitespace-nowrap text-primary-dark">{{ ing.quantityOnHand | qty: ing.baseUnit : ing.displayUnit }}</td>
@@ -83,7 +87,12 @@
               @else { <span class="text-warning">ยังไม่มีราคา</span> }
             </td>
             <td><app-ingredient-badges [ingredient]="ing" /></td>
-            <td><app-icon name="chevron-right" [size]="18" class="text-muted" /></td>
+            <td class="py-1 pr-2">
+              <button type="button" class="icon-btn text-muted" [attr.aria-label]="'ตัวเลือกของ ' + ing.name"
+                (click)="$event.stopPropagation(); openMenu(ing, anchorBelow($event))">
+                <app-icon name="more" [size]="20" />
+              </button>
+            </td>
           </tr>
         }
       </tbody>

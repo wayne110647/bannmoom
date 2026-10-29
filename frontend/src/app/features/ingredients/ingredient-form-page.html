@@ -65,5 +65,11 @@
         @if (saving()) { กำลังบันทึก... } @else { <app-icon name="save" [size]="18" /> บันทึก }
       </button>
     </div>
+
+    @if (isEdit) {
+      <button type="button" class="btn-ghost btn-block text-danger hover:bg-danger/10" (click)="remove()">
+        <app-icon name="trash" [size]="18" /> ลบวัตถุดิบนี้
+      </button>
+    }
   </form>
 }

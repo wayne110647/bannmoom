@@ -25,12 +25,16 @@ export class HttpIngredientRepository extends IngredientRepository {
   stockIn(id: string, input: StockInInput) { return this.http.post<Ingredient>(api(`/ingredients/${id}/stock-in`), input); }
   usage(id: string, input: UsageInput) { return this.http.post<Ingredient>(api(`/ingredients/${id}/usages`), input); }
   adjust(id: string, input: AdjustmentInput) { return this.http.post<Ingredient>(api(`/ingredients/${id}/adjustments`), input); }
+  remove(id: string) { return this.http.delete<void>(api(`/ingredients/${id}`)); }
+  restore(id: string) { return this.http.post<Ingredient>(api(`/ingredients/${id}/restore`), null); }
 }
 
 @Injectable()
 export class HttpProductRepository extends ProductRepository {
   private http = inject(HttpClient);
   list() { return this.http.get<Product[]>(api('/products')); }
+  remove(id: string) { return this.http.delete<void>(api(`/products/${id}`)); }
+  restore(id: string) { return this.http.post<void>(api(`/products/${id}/restore`), null); }
 }
 
 @Injectable()

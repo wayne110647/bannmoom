@@ -20,14 +20,14 @@ const TX_COLUMNS = `
 const duplicateName = (name: string) => conflict(`มีวัตถุดิบชื่อ "${name}" อยู่แล้ว`);
 
 export async function listIngredients(sql: Sql): Promise<Ingredient[]> {
-  const rows = await sql.query<Ingredient>(`SELECT ${COLUMNS} FROM ingredients`);
+  const rows = await sql.query<Ingredient>(`SELECT ${COLUMNS} FROM ingredients WHERE archived_at IS NULL`);
   return rows.sort((a, b) => a.name.localeCompare(b.name, 'th'));
 }
 
 /** `forUpdate` locks the row until the transaction ends, so two stock changes can't race. */
 export async function getIngredient(sql: Sql, id: string, forUpdate = false): Promise<Ingredient> {
   const [row] = await sql.query<Ingredient>(
-    `SELECT ${COLUMNS} FROM ingredients WHERE id = $1${forUpdate ? ' FOR UPDATE' : ''}`,
+    `SELECT ${COLUMNS} FROM ingredients WHERE id = $1 AND archived_at IS NULL${forUpdate ? ' FOR UPDATE' : ''}`,
     [id],
   );
   if (!row) throw notFound('ไม่พบวัตถุดิบนี้ อาจถูกลบไปแล้ว');
@@ -48,7 +48,7 @@ export async function createIngredient(db: Db, input: NewIngredientInput): Promi
       return getIngredient(tx, id);
     });
   } catch (e) {
-    if (isUniqueViolation(e, 'ingredients_name_key')) throw duplicateName(input.name);
+    if (isUniqueViolation(e, 'ingredients_name_active_key')) throw duplicateName(input.name);
     throw e;
   }
 }
@@ -65,7 +65,7 @@ export async function updateIngredient(db: Db, id: string, input: IngredientInpu
       [id, input.name, input.category, input.displayUnit, toNumber(toBase(dec(input.minQuantity), input.displayUnit))],
     );
   } catch (e) {
-    if (isUniqueViolation(e, 'ingredients_name_key')) throw duplicateName(input.name);
+    if (isUniqueViolation(e, 'ingredients_name_active_key')) throw duplicateName(input.name);
     throw e;
   }
   return getIngredient(db, id);
@@ -107,6 +107,41 @@ export function recordAdjustment(db: Db, id: string, input: AdjustmentInput): Pr
     await move(tx, ing, 'adjustment', delta, { reason: input.reason, note: input.note });
     return getIngredient(tx, id);
   });
+}
+
+/**
+ * "Delete" = archive: the row stays so its stock history remains intact and undo can restore it.
+ * Refused while a menu still uses the ingredient, because that menu's cost would silently break.
+ */
+export function archiveIngredient(db: Db, id: string): Promise<void> {
+  return db.transaction(async (tx) => {
+    await getIngredient(tx, id, true);
+    const usedBy = await tx.query<{ name: string }>(
+      `SELECT r.name FROM recipe_items i JOIN recipes r ON r.id = i.recipe_id
+       WHERE i.ingredient_id = $1 AND r.archived_at IS NULL ORDER BY r.name`,
+      [id],
+    );
+    if (usedBy.length) {
+      throw conflict(`ยังใช้อยู่ในเมนู ${usedBy.map((r) => `"${r.name}"`).join(', ')} — เอาออกจากสูตรก่อนแล้วค่อยลบ`);
+    }
+    await tx.query(`UPDATE ingredients SET archived_at = now() WHERE id = $1`, [id]);
+  });
+}
+
+export async function restoreIngredient(db: Db, id: string): Promise<Ingredient> {
+  try {
+    const [row] = await db.query<{ name: string }>(
+      `UPDATE ingredients SET archived_at = NULL WHERE id = $1 AND archived_at IS NOT NULL RETURNING name`,
+      [id],
+    );
+    if (!row) throw notFound('ไม่พบวัตถุดิบที่ลบไป');
+  } catch (e) {
+    if (isUniqueViolation(e, 'ingredients_name_active_key')) {
+      throw conflict('กู้คืนไม่ได้ เพราะมีวัตถุดิบชื่อเดียวกันเพิ่มเข้ามาแล้ว');
+    }
+    throw e;
+  }
+  return getIngredient(db, id);
 }
 
 /** Stock arriving: updates the weighted average cost and nearest expiry, then records the movement. */

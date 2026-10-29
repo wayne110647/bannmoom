@@ -8,6 +8,7 @@ import { dec, toNumber } from '../../core/domain/decimal';
 import { UNIT_CODES, UnitCode, baseUnitOf, compatibleUnits, convert, unitLabel } from '../../core/domain/units';
 import { toUserMessage } from '../../core/errors';
 import { INGREDIENT_CATEGORIES, Ingredient, IngredientCategory, IngredientInput } from '../../core/models';
+import { injectConfirmDelete } from '../../shared/confirm-delete';
 import { Icon } from '../../shared/icon';
 import { PageHeader } from '../../shared/page-header';
 import { ErrorState, Loading } from '../../shared/states';
@@ -24,6 +25,7 @@ export class IngredientFormPage {
   private readonly repo = inject(IngredientRepository);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly confirmDelete = injectConfirmDelete();
 
   protected readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
   protected readonly isEdit = this.id !== null;
@@ -109,6 +111,18 @@ export class IngredientFormPage {
         this.router.navigate(['/stock', saved.id], { replaceUrl: true });
       },
       error: (e) => this.toast.error(toUserMessage(e)),
+    });
+  }
+
+  protected remove() {
+    const ing = this.existing();
+    if (!ing) return;
+    this.confirmDelete({
+      name: ing.name,
+      remove: () => this.repo.remove(ing.id),
+      restore: () => this.repo.restore(ing.id),
+      onRemoved: () => this.router.navigate(['/stock'], { replaceUrl: true }),
+      onRestored: () => this.router.navigate(['/stock', ing.id]),
     });
   }
 

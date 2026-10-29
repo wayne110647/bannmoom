@@ -32,8 +32,15 @@
   <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
     @for (p of visible(); track p.id) {
       @let profit = this.profit(p);
-      <li class="card flex flex-col p-2.5" [class.opacity-60]="!p.isActive">
-        <app-product-thumb [name]="p.name" [imageUrl]="p.imageUrl" [category]="p.category" class="aspect-[4/3] w-full" />
+      <li class="card relative flex flex-col p-2.5" [class.opacity-60]="!p.isActive" (appLongPress)="openMenu(p, $event)">
+        <!-- Tapping the picture opens the same menu — easier to find than long-press. -->
+        <button type="button" class="block w-full rounded-xl" [attr.aria-label]="'ตัวเลือกของ ' + p.name" (click)="openMenu(p, anchorBelow($event))">
+          <app-product-thumb [name]="p.name" [imageUrl]="p.imageUrl" [category]="p.category" class="aspect-[4/3] w-full" />
+        </button>
+        <button type="button" class="absolute top-3.5 right-3.5 flex size-11 items-center justify-center rounded-full bg-surface/90 text-primary-dark shadow-sm backdrop-blur active:bg-soft"
+          [attr.aria-label]="'ตัวเลือกของ ' + p.name" (click)="openMenu(p, anchorBelow($event))">
+          <app-icon name="more" [size]="22" />
+        </button>
         <div class="flex flex-1 flex-col px-1 pt-2.5">
           <p class="line-clamp-1 font-normal">{{ p.name }}</p>
           <p class="num text-primary-dark">{{ p.sellPrice | baht: true }} <span class="text-xs text-muted">/{{ p.saleUnit }}</span></p>

@@ -8,6 +8,7 @@ import { CostResult, calculateCost } from '../../core/domain/cost';
 import { UnitCode, compatibleUnits, unitLabel } from '../../core/domain/units';
 import { toUserMessage } from '../../core/errors';
 import { Ingredient, MenuRecipeInput, PRODUCT_CATEGORIES, ProductCategory, RecipeItem } from '../../core/models';
+import { injectConfirmDelete } from '../../shared/confirm-delete';
 import { BahtPipe } from '../../shared/format';
 import { Icon } from '../../shared/icon';
 import { PageHeader } from '../../shared/page-header';
@@ -45,6 +46,9 @@ export class RecipeFormPage {
   protected readonly loadError = signal('');
   protected readonly saving = signal(false);
   protected readonly ingredients = signal<Ingredient[]>([]);
+  /** The menu item this recipe belongs to (edit mode); deleting removes both. */
+  protected readonly productId = signal<string | null>(null);
+  private readonly confirmDelete = injectConfirmDelete();
 
   protected readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(80)] }),
@@ -110,6 +114,7 @@ export class RecipeFormPage {
         this.items.clear();
         if (recipe) {
           const product = products.find((p) => p.id === recipe.productId);
+          this.productId.set(recipe.productId);
           this.form.patchValue({
             name: recipe.name,
             category: product?.category ?? 'other',
@@ -165,6 +170,20 @@ export class RecipeFormPage {
   protected ingredientOptions(index: number): Ingredient[] {
     const used = new Set(this.value().items.filter((_, i) => i !== index).map((it) => it.ingredientId));
     return this.ingredients().filter((i) => !used.has(i.id));
+  }
+
+  protected remove() {
+    const productId = this.productId();
+    if (!productId) return;
+    const name = this.form.controls.name.value;
+    this.confirmDelete({
+      name,
+      detail: 'สูตรของเมนูนี้จะถูกลบด้วย — กด "เลิกทำ" ได้ทันทีถ้ากดผิด',
+      remove: () => this.products.remove(productId),
+      restore: () => this.products.restore(productId),
+      onRemoved: () => this.router.navigate(['/recipes'], { replaceUrl: true }),
+      onRestored: () => this.router.navigate(['/recipes', this.id, 'edit']),
+    });
   }
 
   protected submit() {
