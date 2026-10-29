@@ -22,7 +22,7 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "REPLACE_WITH_HYPERDRIVE_ID",
+      "id": "79a352d169ba421e99b02677376fa387",
       "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54329/postgres"
     }
   ],
