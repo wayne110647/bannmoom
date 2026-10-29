@@ -101,17 +101,3 @@ export const SEED_PRODUCTS: SeedProduct[] = [
   { id: 'prd-bread', name: 'ขนมปังเนยสด', category: 'bread', description: 'ยังไม่ได้บันทึกสูตร', imageUrl: null, recipeId: null, saleUnit: 'ชิ้น', sellPrice: 20, isActive: true },
   { id: 'prd-basque', name: 'ชีสเค้กหน้าไหม้', category: 'cake', description: 'พักการขายชั่วคราว', imageUrl: null, recipeId: null, saleUnit: 'ชิ้น', sellPrice: 160, isActive: false },
 ];
-
-/** Sales figures are sample numbers only — orders/sales arrive in Phase 3. */
-export const SEED_SALES_TODAY = {
-  todaySales: 2480,
-  todaySalesChangePct: 12,
-  estimatedGrossProfit: 1620,
-  orders: { toHandle: 3, pending: 1, preparing: 2 },
-  bestSellers: [
-    { productId: 'prd-brownie', qtySold: 25 },
-    { productId: 'prd-cookie', qtySold: 18 },
-    { productId: 'prd-chocake', qtySold: 12 },
-    { productId: 'prd-muffin', qtySold: 8 },
-  ],
-};

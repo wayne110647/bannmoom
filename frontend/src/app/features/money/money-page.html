@@ -1,0 +1,86 @@
+<app-page-header title="รายรับ-รายจ่าย" subtitle="ขายได้เท่าไร จ่ายไปเท่าไร เหลือเท่าไร">
+  <a routerLink="/money/expense" class="btn-primary">
+    <app-icon name="plus" [size]="18" /> <span class="hidden sm:inline">บันทึกรายจ่าย</span>
+  </a>
+</app-page-header>
+
+<div class="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+  @for (p of periods; track p.value) {
+    <button type="button" class="chip" [class.chip-active]="period() === p.value" (click)="period.set(p.value)">{{ p.label }}</button>
+  }
+</div>
+
+@let s = ledger.state();
+@if (s.status === 'loading') {
+  <app-loading [rows]="3" />
+} @else if (s.status === 'error') {
+  <app-error-state [message]="s.message" (retry)="ledger.reload()" />
+} @else {
+  @let l = s.data;
+
+  <!-- What's left -->
+  <section class="card card-pad mb-3 text-center">
+    <p class="text-sm text-muted">เหลือ (ขายได้ − จ่ายไป)</p>
+    <p class="num text-3xl font-medium" [class]="l.net >= 0 ? 'text-success' : 'text-danger'">{{ signed(l.net, false) }}</p>
+  </section>
+
+  <section class="mb-3 grid grid-cols-2 gap-3">
+    <div class="card card-pad">
+      <p class="mb-1 flex items-center gap-1.5 text-sm text-muted"><app-icon name="bag" [size]="18" /> ขายได้</p>
+      <p class="num text-xl font-medium text-success">{{ l.income | baht }}</p>
+    </div>
+    <div class="card card-pad">
+      <p class="mb-1 flex items-center gap-1.5 text-sm text-muted"><app-icon name="wallet" [size]="18" /> จ่ายไป</p>
+      <p class="num text-xl font-medium text-danger">{{ l.purchases + l.expenses | baht }}</p>
+      <p class="mt-0.5 text-xs text-muted">วัตถุดิบ {{ l.purchases | baht: true }} · อื่น ๆ {{ l.expenses | baht: true }}</p>
+    </div>
+  </section>
+
+  <p class="mb-6 rounded-xl bg-soft/70 p-3 text-sm text-muted">
+    กำไรจากขนมที่ขาย (หักต้นทุนตามสูตร): <span class="num font-medium text-primary-dark">{{ l.grossProfit | baht }}</span>
+    @if (l.costIncomplete) { <br /><span class="text-xs text-warning">บางเมนูยังไม่มีต้นทุน เลยไม่ได้นับในกำไรนี้</span> }
+  </p>
+
+  <!-- Entries by day -->
+  @if (days().length === 0) {
+    <app-empty-state icon="wallet" title="ยังไม่มีรายการในช่วงนี้"
+      detail="บันทึกยอดขายที่หน้า “ขาย” ส่วนการซื้อวัตถุดิบผ่าน “รับเข้า” จะขึ้นที่นี่เอง">
+      <a routerLink="/sales" class="btn-primary"><app-icon name="bag" [size]="18" /> ไปบันทึกยอดขาย</a>
+    </app-empty-state>
+  } @else {
+    @for (day of days(); track day.date) {
+      <section class="mb-4">
+        <div class="mb-2 flex items-baseline justify-between px-1">
+          <h2 class="text-sm font-medium text-primary-dark">{{ day.date === today ? 'วันนี้' : (day.date | thDate) }}</h2>
+          <span class="num text-xs" [class]="day.total >= 0 ? 'text-success' : 'text-danger'">{{ signed(day.total) }}</span>
+        </div>
+        <ul class="card divide-y divide-line">
+          @for (e of day.entries; track e.kind + e.id) {
+            <li class="flex items-center gap-3 py-2 pr-1.5 pl-3">
+              <span class="flex size-10 shrink-0 items-center justify-center rounded-full"
+                [class]="e.amount >= 0 ? 'bg-success/12 text-success' : 'bg-danger/10 text-danger'">
+                <app-icon [name]="entryIcon[e.kind]" [size]="20" />
+              </span>
+              <div class="min-w-0 flex-1 py-1">
+                <p class="text-sm text-ink">{{ e.title }}</p>
+                @if (e.detail) { <p class="line-clamp-2 text-xs text-muted">{{ e.detail }}</p> }
+              </div>
+              <span class="num shrink-0 font-medium" [class]="e.amount >= 0 ? 'text-success' : 'text-danger'">
+                {{ signed(e.amount) }}
+              </span>
+              @if (e.kind !== 'purchase') {
+                <button type="button" class="icon-btn shrink-0 text-muted" [attr.aria-label]="'ตัวเลือกของ ' + e.title"
+                  (click)="openEntryMenu(e, anchorBelow($event))">
+                  <app-icon name="more" [size]="22" />
+                </button>
+              } @else {
+                <!-- Purchases come from stock-in; they're fixed from the stock page. -->
+                <span class="size-11 shrink-0" aria-hidden="true"></span>
+              }
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+}

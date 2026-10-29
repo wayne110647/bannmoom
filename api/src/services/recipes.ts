@@ -1,14 +1,11 @@
 import { CostResult, calculateCost } from '../../../frontend/src/app/core/domain/cost';
-import { stockLevel } from '../../../frontend/src/app/core/domain/inventory';
 import { isCompatible } from '../../../frontend/src/app/core/domain/units';
 import type {
-  CostCalculationInput, DashboardSummary, Ingredient, MenuRecipeInput, Product, Recipe, SavedCostCalculation,
+  CostCalculationInput, Ingredient, MenuRecipeInput, Product, Recipe, SavedCostCalculation,
 } from '../../../frontend/src/app/core/models';
 import { Db, Sql, isUniqueViolation } from '../db';
 import { badRequest, conflict, notFound } from '../errors';
 import { listIngredients } from './ingredients';
-
-const EXPIRY_WARNING_DAYS = 7;
 
 const RECIPE_SELECT = `
   SELECT r.id, r.name, r.product_id AS "productId", r.yield_qty AS "yieldQty",
@@ -202,34 +199,4 @@ export async function saveCostCalculation(db: Db, input: CostCalculationInput): 
       input.sellPrice, result.total, result.perPiece],
   );
   return saved;
-}
-
-/* ---------------- Dashboard ---------------- */
-
-/** Today's date in Thailand, as a Date whose local fields read Bangkok time (Workers run in UTC). */
-const bangkokToday = () => new Date(Date.now() + 7 * 3_600_000);
-
-/** Sales and orders arrive in a later phase; until then those figures are zero, never invented. */
-export async function dashboardSummary(sql: Sql): Promise<DashboardSummary> {
-  const ingredients = await listIngredients(sql);
-  const today = bangkokToday();
-  const low = ingredients.filter((i) => stockLevel(i.quantityOnHand, i.minQuantity) !== 'ok');
-  const expiring = ingredients.filter(
-    (i) => i.quantityOnHand > 0 && i.nearestExpiry !== null && isExpiringSoonOn(i.nearestExpiry, today),
-  );
-  return {
-    todaySales: 0,
-    todaySalesChangePct: null,
-    estimatedGrossProfit: 0,
-    orders: { toHandle: 0, pending: 0, preparing: 0 },
-    lowStock: { count: low.length, names: low.map((i) => i.name) },
-    expiringSoon: { count: expiring.length, names: expiring.map((i) => i.name) },
-    bestSellers: [],
-  };
-}
-
-/** Days are counted from `today`'s UTC date fields, which bangkokToday() has already shifted to Thai time. */
-function isExpiringSoonOn(isoDate: string, today: Date) {
-  const start = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  return Math.round((Date.parse(isoDate) - start) / 86_400_000) <= EXPIRY_WARNING_DAYS;
 }

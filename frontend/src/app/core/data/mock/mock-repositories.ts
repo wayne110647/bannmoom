@@ -7,18 +7,21 @@
 import { Injectable } from '@angular/core';
 import { Observable, defer, delay, of, throwError } from 'rxjs';
 import { calculateCost } from '../../domain/cost';
-import { dec, mul, sub, toNumber } from '../../domain/decimal';
+import { addDaysIso, toIsoDate, todayIso } from '../../dates';
+import { dec, mul, round, sub, toNumber } from '../../domain/decimal';
 import { costPerBaseUnit, isExpiringSoon, stockLevel, weightedAverageCost } from '../../domain/inventory';
 import { baseUnitOf, convert, isCompatible, toBase, unitLabel } from '../../domain/units';
 import { AppError } from '../../errors';
 import {
-  AdjustmentInput, CostCalculationInput, DashboardSummary, Ingredient, IngredientInput, NewIngredientInput,
-  MenuRecipeInput, Product, Recipe, SavedCostCalculation, StockInInput, StockTransaction, StockTxType, UsageInput,
+  AdjustmentInput, CostCalculationInput, DashboardSummary, EXPENSE_CATEGORIES, Expense, ExpenseInput, Ingredient,
+  IngredientInput, Ledger, LedgerEntry, MenuRecipeInput, NewIngredientInput, Product, Recipe, Sale, SaleInput,
+  SaleResult, SavedCostCalculation, StockInInput, StockShortage, StockTransaction, StockTxType, UsageInput,
 } from '../../models';
 import {
   CostCalculationRepository, DashboardRepository, IngredientRepository, ProductRepository, RecipeRepository,
+  SalesRepository,
 } from '../repositories';
-import { SEED_INGREDIENTS, SEED_PRODUCTS, SEED_RECIPES, SEED_SALES_TODAY, SEED_TRANSACTIONS } from './mock-seed';
+import { SEED_INGREDIENTS, SEED_PRODUCTS, SEED_RECIPES, SEED_TRANSACTIONS } from './mock-seed';
 
 const LATENCY_MS = 300;
 const EXPIRY_WARNING_DAYS = 7;
@@ -344,27 +347,191 @@ export class MockCostCalculationRepository extends CostCalculationRepository {
   }
 }
 
+type MockSale = Sale & { cancelled: boolean; taken: { ingredientId: string; quantity: number }[] };
+
+/** Same rules as the API: sales always save, stock goes down to 0 at most, cancelling returns what was taken. */
+@Injectable({ providedIn: 'root' })
+export class MockMoney {
+  sales: MockSale[] = [];
+  expenses: (Expense & { archived: boolean })[] = [];
+
+  constructor(private db: MockDb) {}
+
+  activeSales(from: string, to: string) {
+    return this.sales.filter((s) => !s.cancelled && s.soldOn >= from && s.soldOn <= to);
+  }
+
+  ledger(from: string, to: string): Ledger {
+    const entries: LedgerEntry[] = [];
+    let income = 0, grossProfit = 0, purchases = 0, expenses = 0, costIncomplete = false;
+    for (const s of this.activeSales(from, to)) {
+      income += s.total;
+      for (const i of s.items) {
+        if (i.unitCost === null) costIncomplete = true;
+        else grossProfit += toNumber(mul(sub(dec(i.unitPrice), dec(i.unitCost)), dec(i.quantity)));
+      }
+      entries.push({
+        kind: 'sale', id: s.id, date: s.soldOn, createdAt: s.createdAt, title: 'ขายขนม', amount: s.total,
+        detail: s.items.map((i) => `${i.name} ×${i.quantity}`).join(', '),
+      });
+    }
+    for (const e of this.expenses.filter((x) => !x.archived && x.spentOn >= from && x.spentOn <= to)) {
+      expenses += e.amount;
+      entries.push({
+        kind: 'expense', id: e.id, date: e.spentOn, createdAt: e.createdAt, amount: -e.amount, detail: e.note,
+        title: EXPENSE_CATEGORIES.find((c) => c.value === e.category)?.label ?? 'รายจ่าย',
+      });
+    }
+    for (const t of this.db.transactions.filter((x) => x.type === 'stock_in')) {
+      const date = toIsoDate(new Date(t.createdAt));
+      if (date < from || date > to) continue;
+      const ing = this.db.ingredients.find((i) => i.id === t.ingredientId);
+      const paid = toNumber(round(mul(dec(t.quantity), dec(t.unitCost ?? 0)), 2));
+      purchases += paid;
+      entries.push({
+        kind: 'purchase', id: t.id, date, createdAt: t.createdAt, amount: -paid,
+        title: `ซื้อ${ing?.name ?? 'วัตถุดิบ'}`, detail: 'รับเข้าสต็อก',
+      });
+    }
+    entries.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    return {
+      from, to, income: r2(income), purchases: r2(purchases), expenses: r2(expenses),
+      net: r2(income - purchases - expenses), grossProfit: r2(grossProfit), costIncomplete, entries,
+    };
+  }
+}
+
+@Injectable()
+export class MockSalesRepository extends SalesRepository {
+  constructor(private db: MockDb, private money: MockMoney) { super(); }
+
+  list(from: string, to: string) {
+    return respond<Sale[]>(() => this.money.activeSales(from, to).map(({ cancelled, taken, ...s }) => s).reverse());
+  }
+
+  create(input: SaleInput) {
+    return respond<SaleResult>(() => {
+      if (input.soldOn > todayIso()) throw new AppError('บันทึกยอดขายของวันที่ยังไม่ถึงไม่ได้');
+      const needs = new Map<string, number>();
+      const items = input.items.map(({ productId, quantity }) => {
+        const p = this.db.products.find((x) => x.id === productId);
+        if (!p) throw new AppError('มีเมนูที่ถูกลบไปแล้ว กรุณาโหลดหน้าใหม่');
+        const recipe = p.recipeId ? this.db.recipes.find((r) => r.id === p.recipeId) : undefined;
+        for (const ri of recipe?.items ?? []) {
+          const ing = this.db.ingredient(ri.ingredientId);
+          const used = (toNumber(convert(dec(ri.quantity), ri.unit, ing.baseUnit)) / recipe!.yieldQty) * quantity;
+          needs.set(ing.id, (needs.get(ing.id) ?? 0) + used);
+        }
+        return {
+          productId, name: p.name, saleUnit: p.saleUnit, quantity, unitPrice: p.sellPrice,
+          unitCost: this.db.productCost(p.recipeId),
+        };
+      });
+      const sale: MockSale = {
+        id: newId('sale'), soldOn: input.soldOn, note: input.note, createdAt: now(), items, cancelled: false, taken: [],
+        total: items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0),
+      };
+      const shortages: StockShortage[] = [];
+      for (const [id, need] of needs) {
+        const ing = this.db.ingredient(id);
+        if (need > ing.quantityOnHand) {
+          shortages.push({
+            ingredientId: id, name: ing.name, needed: need, available: ing.quantityOnHand,
+            baseUnit: ing.baseUnit, displayUnit: ing.displayUnit,
+          });
+        }
+        const take = toNumber(dec(Math.min(need, ing.quantityOnHand)));
+        if (take > 0) {
+          this.db.move(ing, 'sale', -take);
+          sale.taken.push({ ingredientId: id, quantity: take });
+        }
+      }
+      this.money.sales.push(sale);
+      const { cancelled, taken, ...out } = sale;
+      return { sale: out, shortages };
+    });
+  }
+
+  cancel(id: string) {
+    return respond<void>(() => {
+      const sale = this.money.sales.find((s) => s.id === id && !s.cancelled);
+      if (!sale) throw new AppError('ไม่พบรายการขายนี้ อาจถูกยกเลิกไปแล้ว');
+      for (const t of sale.taken) {
+        const ing =
+          this.db.ingredients.find((i) => i.id === t.ingredientId) ??
+          this.db.archived.ingredients.find((i) => i.id === t.ingredientId);
+        if (ing) this.db.move(ing, 'sale_reversal', t.quantity);
+      }
+      sale.cancelled = true;
+    });
+  }
+
+  createExpense(input: ExpenseInput) {
+    return respond<Expense>(() => {
+      if (input.spentOn > todayIso()) throw new AppError('บันทึกรายจ่ายของวันที่ยังไม่ถึงไม่ได้');
+      const expense = { ...input, id: newId('exp'), createdAt: now() };
+      this.money.expenses.push({ ...expense, archived: false });
+      return expense;
+    });
+  }
+
+  removeExpense(id: string) {
+    return respond<void>(() => this.setArchived(id, true));
+  }
+
+  restoreExpense(id: string) {
+    return respond<void>(() => this.setArchived(id, false));
+  }
+
+  ledger(from: string, to: string) {
+    return respond(() => this.money.ledger(from, to));
+  }
+
+  private setArchived(id: string, archived: boolean) {
+    const e = this.money.expenses.find((x) => x.id === id && x.archived !== archived);
+    if (!e) throw new AppError('ไม่พบรายจ่ายนี้');
+    e.archived = archived;
+  }
+}
+
 @Injectable()
 export class MockDashboardRepository extends DashboardRepository {
-  constructor(private db: MockDb) { super(); }
+  constructor(private db: MockDb, private money: MockMoney) { super(); }
 
   summary() {
     return respond<DashboardSummary>(() => {
+      const today = todayIso();
+      const yesterday = addDaysIso(today, -1);
+      const l = this.money.ledger(today, today);
+      const yesterdaySales = this.money.activeSales(yesterday, yesterday).reduce((n, s) => n + s.total, 0);
+      const sold = new Map<string, number>();
+      for (const s of this.money.activeSales(today, today)) {
+        for (const i of s.items) sold.set(i.productId, (sold.get(i.productId) ?? 0) + i.quantity);
+      }
+      const bestSellers = [...sold.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .flatMap(([productId, qtySold]) => {
+          const p = this.db.products.find((x) => x.id === productId);
+          return p
+            ? [{ productId, name: p.name, category: p.category, imageUrl: p.imageUrl, saleUnit: p.saleUnit, sellPrice: p.sellPrice, qtySold }]
+            : [];
+        })
+        .slice(0, 4);
       const low = this.db.ingredients.filter((i) => stockLevel(i.quantityOnHand, i.minQuantity) !== 'ok');
       const expiring = this.db.ingredients.filter(
         (i) => i.quantityOnHand > 0 && isExpiringSoon(i.nearestExpiry, EXPIRY_WARNING_DAYS),
       );
       return {
-        todaySales: SEED_SALES_TODAY.todaySales,
-        todaySalesChangePct: SEED_SALES_TODAY.todaySalesChangePct,
-        estimatedGrossProfit: SEED_SALES_TODAY.estimatedGrossProfit,
-        orders: SEED_SALES_TODAY.orders,
+        todaySales: l.income,
+        todaySalesChangePct: yesterdaySales > 0 ? Math.round(((l.income - yesterdaySales) / yesterdaySales) * 100) : null,
+        estimatedGrossProfit: l.grossProfit,
+        costIncomplete: l.costIncomplete,
+        todayUnitsSold: [...sold.values()].reduce((a, b) => a + b, 0),
+        todayExpenses: l.purchases + l.expenses,
         lowStock: { count: low.length, names: low.map((i) => i.name) },
         expiringSoon: { count: expiring.length, names: expiring.map((i) => i.name) },
-        bestSellers: SEED_SALES_TODAY.bestSellers.map((b) => {
-          const p = this.db.products.find((x) => x.id === b.productId)!;
-          return { productId: p.id, name: p.name, category: p.category, imageUrl: p.imageUrl, saleUnit: p.saleUnit, sellPrice: p.sellPrice, qtySold: b.qtySold };
-        }),
+        bestSellers,
       };
     });
   }

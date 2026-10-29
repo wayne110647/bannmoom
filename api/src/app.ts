@@ -3,16 +3,19 @@ import { z } from 'zod';
 import { Db, DbHandle } from './db';
 import { ApiError } from './errors';
 import {
-  archiveIngredient, createIngredient, getIngredient, listIngredients, listTransactions, recordAdjustment, recordUsage, stockIn,
-  restoreIngredient, updateIngredient,
+  archiveIngredient, createIngredient, getIngredient, listIngredients, listTransactions, recordAdjustment, recordUsage,
+  restoreIngredient, stockIn, updateIngredient,
 } from './services/ingredients';
 import {
-  archiveProduct, createRecipe, dashboardSummary, getRecipe, listProducts, listRecipes, restoreProduct,
-  saveCostCalculation, updateRecipe,
+  archiveProduct, createRecipe, getRecipe, listProducts, listRecipes, restoreProduct, saveCostCalculation,
+  updateRecipe,
 } from './services/recipes';
 import {
-  adjustmentSchema, costCalculationSchema, ingredientSchema, menuRecipeSchema, newIngredientSchema, stockInSchema,
-  usageSchema,
+  archiveExpense, checkRange, createExpense, createSale, dashboardSummary, ledger, listSales, restoreExpense, voidSale,
+} from './services/sales';
+import {
+  adjustmentSchema, costCalculationSchema, expenseSchema, ingredientSchema, menuRecipeSchema, newIngredientSchema,
+  rangeSchema, saleSchema, stockInSchema, usageSchema,
 } from './validation';
 
 export interface Bindings {
@@ -99,8 +102,37 @@ export function createApp(openDb: (env: Bindings) => Promise<DbHandle>) {
     c.json(await saveCostCalculation(c.var.db, await body(c, costCalculationSchema)), 201),
   );
 
+  /* ---------- Sales & money ---------- */
+  const range = (c: Context<AppEnv>) => {
+    const r = rangeSchema.parse(c.req.query());
+    checkRange(r.from, r.to);
+    return r;
+  };
+  app.get('/sales', async (c) => {
+    const { from, to } = range(c);
+    return c.json(await listSales(c.var.db, from, to));
+  });
+  app.post('/sales', async (c) => c.json(await createSale(c.var.db, await body(c, saleSchema)), 201));
+  app.post('/sales/:id/void', async (c) => {
+    await voidSale(c.var.db, c.req.param('id'));
+    return c.body(null, 204);
+  });
+  app.post('/expenses', async (c) => c.json(await createExpense(c.var.db, await body(c, expenseSchema)), 201));
+  app.delete('/expenses/:id', async (c) => {
+    await archiveExpense(c.var.db, c.req.param('id'));
+    return c.body(null, 204);
+  });
+  app.post('/expenses/:id/restore', async (c) => {
+    await restoreExpense(c.var.db, c.req.param('id'));
+    return c.body(null, 204);
+  });
+
   /* ---------- Reports ---------- */
   app.get('/reports/summary', async (c) => c.json(await dashboardSummary(c.var.db)));
+  app.get('/reports/ledger', async (c) => {
+    const { from, to } = range(c);
+    return c.json(await ledger(c.var.db, from, to));
+  });
 
   return app;
 }

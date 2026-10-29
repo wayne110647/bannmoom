@@ -24,10 +24,19 @@ export async function listIngredients(sql: Sql): Promise<Ingredient[]> {
   return rows.sort((a, b) => a.name.localeCompare(b.name, 'th'));
 }
 
-/** `forUpdate` locks the row until the transaction ends, so two stock changes can't race. */
-export async function getIngredient(sql: Sql, id: string, forUpdate = false): Promise<Ingredient> {
+/**
+ * `forUpdate` locks the row until the transaction ends, so two stock changes can't race.
+ * `includeArchived` is for giving stock back to an ingredient deleted after the sale that used it.
+ */
+export async function getIngredient(
+  sql: Sql,
+  id: string,
+  forUpdate = false,
+  includeArchived = false,
+): Promise<Ingredient> {
   const [row] = await sql.query<Ingredient>(
-    `SELECT ${COLUMNS} FROM ingredients WHERE id = $1 AND archived_at IS NULL${forUpdate ? ' FOR UPDATE' : ''}`,
+    `SELECT ${COLUMNS} FROM ingredients WHERE id = $1${includeArchived ? '' : ' AND archived_at IS NULL'}` +
+      (forUpdate ? ' FOR UPDATE' : ''),
     [id],
   );
   if (!row) throw notFound('ไม่พบวัตถุดิบนี้ อาจถูกลบไปแล้ว');
@@ -163,12 +172,18 @@ async function receive(tx: Sql, ing: Ingredient, input: StockInInput, type: Stoc
 }
 
 /** The only way stock quantity changes: always writes a transaction row in the same DB transaction. */
-async function move(
+export async function move(
   tx: Sql,
   ing: Ingredient,
   type: StockTxType,
   deltaBase: number,
-  extra: { unitCost?: number | null; reason?: string | null; note?: string | null; expiryDate?: string | null },
+  extra: {
+    unitCost?: number | null;
+    reason?: string | null;
+    note?: string | null;
+    expiryDate?: string | null;
+    saleId?: string | null;
+  },
 ) {
   const balance = toNumber(dec(ing.quantityOnHand) + dec(deltaBase));
   if (balance < 0) {
@@ -177,9 +192,10 @@ async function move(
   }
   await tx.query(`UPDATE ingredients SET quantity_on_hand = $2, updated_at = now() WHERE id = $1`, [ing.id, balance]);
   await tx.query(
-    `INSERT INTO stock_transactions (id, ingredient_id, type, quantity, unit_cost, balance_after, reason, note, expiry_date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    `INSERT INTO stock_transactions
+       (id, ingredient_id, type, quantity, unit_cost, balance_after, reason, note, expiry_date, sale_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [crypto.randomUUID(), ing.id, type, deltaBase, extra.unitCost ?? ing.avgCostPerBaseUnit, balance,
-      extra.reason ?? null, extra.note ?? null, extra.expiryDate ?? null],
+      extra.reason ?? null, extra.note ?? null, extra.expiryDate ?? null, extra.saleId ?? null],
   );
 }

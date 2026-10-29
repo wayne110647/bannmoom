@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { UNIT_CODES, UnitCode } from '../../frontend/src/app/core/domain/units';
-import { INGREDIENT_CATEGORIES, IngredientCategory, PRODUCT_CATEGORIES, ProductCategory } from '../../frontend/src/app/core/models';
+import {
+  EXPENSE_CATEGORIES, ExpenseCategory, INGREDIENT_CATEGORIES, IngredientCategory, PRODUCT_CATEGORIES, ProductCategory,
+} from '../../frontend/src/app/core/models';
 
 /** Request bodies are checked here; business rules (stock can't go negative, units must match…) live in the services. */
 
@@ -63,3 +65,24 @@ export const costCalculationSchema = z.object({
   yieldQty: positive,
   sellPrice: money.nullable(),
 });
+
+const shopDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const saleSchema = z.object({
+  soldOn: shopDate,
+  items: z
+    .array(z.object({ productId: z.string().min(1).max(64), quantity: z.number().finite().gt(0).max(100_000) }))
+    .min(1)
+    .max(100),
+  note,
+});
+
+export const expenseSchema = z.object({
+  spentOn: shopDate,
+  category: z.enum(EXPENSE_CATEGORIES.map((c) => c.value) as [ExpenseCategory, ...ExpenseCategory[]]),
+  amount: positive,
+  note,
+});
+
+/** ?from=YYYY-MM-DD&to=YYYY-MM-DD */
+export const rangeSchema = z.object({ from: shopDate, to: shopDate });

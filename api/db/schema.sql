@@ -92,3 +92,47 @@ ALTER TABLE recipes DROP CONSTRAINT IF EXISTS recipes_name_key;
 -- Names only need to be unique among items that are still in use, so a deleted name can be reused.
 CREATE UNIQUE INDEX IF NOT EXISTS ingredients_name_active_key ON ingredients (name) WHERE archived_at IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS recipes_name_active_key ON recipes (name) WHERE archived_at IS NULL;
+
+-- ---------- Sales & money ----------
+-- A sale is one "บันทึกยอดขาย" entry (often a whole day's count). sold_on is the shop's date (Thai time).
+CREATE TABLE IF NOT EXISTS sales (
+  id         text PRIMARY KEY,
+  sold_on    date NOT NULL,
+  total      numeric(12, 2) NOT NULL CHECK (total >= 0),
+  note       text CHECK (char_length(note) <= 200),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  -- Cancelled entries keep their rows; their stock was given back by sale_reversal transactions.
+  voided_at  timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS sales_sold_on_idx ON sales (sold_on);
+
+-- name/price/cost are copied at sale time, so later menu edits don't rewrite past income.
+CREATE TABLE IF NOT EXISTS sale_items (
+  sale_id    text NOT NULL REFERENCES sales (id) ON DELETE CASCADE,
+  position   smallint NOT NULL,
+  product_id text NOT NULL REFERENCES products (id),
+  name       text NOT NULL,
+  sale_unit  text NOT NULL,
+  quantity   numeric(12, 3) NOT NULL CHECK (quantity > 0),
+  unit_price numeric(12, 2) NOT NULL CHECK (unit_price >= 0),
+  -- Cost per unit from the recipe at sale time; null when the menu has no recipe or prices are missing.
+  unit_cost  numeric(14, 4),
+  PRIMARY KEY (sale_id, position)
+);
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id          text PRIMARY KEY,
+  spent_on    date NOT NULL,
+  category    text NOT NULL,
+  amount      numeric(12, 2) NOT NULL CHECK (amount > 0),
+  note        text CHECK (char_length(note) <= 200),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  archived_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS expenses_spent_on_idx ON expenses (spent_on);
+
+-- Which sale a 'sale' / 'sale_reversal' stock movement belongs to, so cancelling gives back exactly that.
+ALTER TABLE stock_transactions ADD COLUMN IF NOT EXISTS sale_id text REFERENCES sales (id);
+CREATE INDEX IF NOT EXISTS stock_transactions_sale_idx ON stock_transactions (sale_id) WHERE sale_id IS NOT NULL;

@@ -26,10 +26,10 @@ export class DashboardPage {
   protected readonly summary = createLoader(() => this.repo.summary());
 
   protected readonly shortcuts: Shortcut[] = [
+    { label: 'บันทึกยอดขาย', path: '/sales', icon: 'bag' },
+    { label: 'รายรับ-รายจ่าย', path: '/money', icon: 'wallet' },
+    { label: 'ดูสต็อก', path: '/stock', icon: 'package' },
     { label: 'คำนวณต้นทุน', path: '/cost', icon: 'calculator' },
-    { label: 'เพิ่มวัตถุดิบ', path: '/stock/new', icon: 'package' },
-    { label: 'ดูสต็อก', path: '/stock', icon: 'clipboard' },
-    { label: 'เมนูขนม', path: '/menu', icon: 'cake' },
   ];
 
   protected readonly greeting = (() => {

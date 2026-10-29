@@ -168,14 +168,121 @@ export interface SavedCostCalculation extends CostCalculationInput {
   createdAt: string;
 }
 
+/* ---------------- Sales & money ---------------- */
+
+export interface SaleItemInput {
+  productId: string;
+  quantity: number;
+}
+
+/** One "บันทึกยอดขาย" entry — often a whole day's count. Prices come from the menu, never from the client. */
+export interface SaleInput {
+  /** Shop date, YYYY-MM-DD (Thai time). */
+  soldOn: string;
+  items: SaleItemInput[];
+  note: string | null;
+}
+
+export interface SaleItem {
+  productId: string;
+  name: string;
+  saleUnit: string;
+  quantity: number;
+  unitPrice: number;
+  /** Recipe cost per unit at sale time; null = menu had no recipe or ingredient prices were missing. */
+  unitCost: number | null;
+}
+
+export interface Sale {
+  id: string;
+  soldOn: string;
+  total: number;
+  note: string | null;
+  createdAt: string;
+  items: SaleItem[];
+}
+
+/** Stock the app thought it had was less than the sale used; it was taken down to 0. */
+export interface StockShortage {
+  ingredientId: string;
+  name: string;
+  /** In the ingredient's base unit. */
+  needed: number;
+  available: number;
+  baseUnit: UnitCode;
+  displayUnit: UnitCode;
+}
+
+export interface SaleResult {
+  sale: Sale;
+  shortages: StockShortage[];
+}
+
+export type ExpenseCategory = 'utilities' | 'packaging' | 'ingredients' | 'delivery' | 'equipment' | 'other';
+
+export const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
+  { value: 'utilities', label: 'ค่าแก๊ส/น้ำ/ไฟ' },
+  { value: 'packaging', label: 'ถุง/กล่อง/สติกเกอร์' },
+  { value: 'ingredients', label: 'ซื้อของ (ไม่ได้ลงสต็อก)' },
+  { value: 'delivery', label: 'ค่าส่ง/ค่าเดินทาง' },
+  { value: 'equipment', label: 'อุปกรณ์' },
+  { value: 'other', label: 'อื่น ๆ' },
+];
+
+export interface ExpenseInput {
+  spentOn: string;
+  category: ExpenseCategory;
+  amount: number;
+  note: string | null;
+}
+
+export interface Expense extends ExpenseInput {
+  id: string;
+  createdAt: string;
+}
+
+/** One line of the income/expense list. `amount` is + for money in, − for money out. */
+export interface LedgerEntry {
+  kind: 'sale' | 'expense' | 'purchase';
+  id: string;
+  date: string;
+  createdAt: string;
+  title: string;
+  detail: string | null;
+  amount: number;
+}
+
+export interface Ledger {
+  from: string;
+  to: string;
+  /** Money in from sales. */
+  income: number;
+  /** Ingredients bought through "รับเข้า" (stock in). */
+  purchases: number;
+  /** Other expenses entered by hand. */
+  expenses: number;
+  /** income − purchases − expenses: what's actually left. */
+  net: number;
+  /** income − recipe cost of what was sold (only lines whose cost is known). */
+  grossProfit: number;
+  /** Some sold items had no recipe cost, so grossProfit leaves them out. */
+  costIncomplete: boolean;
+  entries: LedgerEntry[];
+}
+
 /* ---------------- Dashboard ---------------- */
 
 export interface DashboardSummary {
   todaySales: number;
   todaySalesChangePct: number | null;
-  /** Gross profit = sales − cost of goods sold (ingredients + packaging), before other expenses. */
+  /** Gross profit = sales − recipe cost of what was sold (ingredients + packaging), before other expenses. */
   estimatedGrossProfit: number;
-  orders: { toHandle: number; pending: number; preparing: number };
+  /** Items sold today without a known recipe cost (left out of the profit). */
+  costIncomplete: boolean;
+  /** Units sold today, and whether anything was recorded yet. */
+  todayUnitsSold: number;
+  /** Money out today: stock-in purchases + other expenses. */
+  todayExpenses: number;
   lowStock: { count: number; names: string[] };
   expiringSoon: { count: number; names: string[] };
   bestSellers: { productId: string; name: string; category: ProductCategory; imageUrl: string | null; saleUnit: string; sellPrice: number; qtySold: number }[];

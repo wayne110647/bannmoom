@@ -41,24 +41,29 @@
 
         <!-- Key numbers -->
         <section class="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <div class="card card-pad">
-            <div class="mb-2 flex items-center gap-2 text-sm text-muted"><app-icon name="wallet" [size]="18" /> ยอดขายวันนี้</div>
+          <a routerLink="/sales" class="card card-pad hover:border-secondary">
+            <div class="mb-2 flex items-center gap-2 text-sm text-muted"><app-icon name="bag" [size]="18" /> ยอดขายวันนี้</div>
             <div class="stat-value">{{ d.todaySales | baht: true }}</div>
             @if (d.todaySalesChangePct !== null) {
               <div class="mt-1 text-xs" [class]="d.todaySalesChangePct >= 0 ? 'text-success' : 'text-danger'">
                 {{ d.todaySalesChangePct >= 0 ? '▲' : '▼' }} {{ d.todaySalesChangePct }}% จากเมื่อวาน
               </div>
+            } @else if (d.todayUnitsSold === 0) {
+              <div class="mt-1 text-xs text-primary">แตะเพื่อบันทึกยอดขาย</div>
             }
-          </div>
-          <div class="card card-pad">
+          </a>
+          <a routerLink="/money" class="card card-pad hover:border-secondary">
             <div class="mb-2 flex items-center gap-2 text-sm text-muted"><app-icon name="trending-up" [size]="18" /> กำไรโดยประมาณ</div>
             <div class="stat-value">{{ d.estimatedGrossProfit | baht: true }}</div>
-            <div class="mt-1 text-xs text-muted">ยอดขาย − ต้นทุนขนม ยังไม่หักค่าใช้จ่ายอื่น</div>
-          </div>
-          <a routerLink="/orders" class="card card-pad hover:border-secondary">
-            <div class="mb-2 flex items-center gap-2 text-sm text-muted"><app-icon name="clipboard" [size]="18" /> ออเดอร์ที่ต้องทำ</div>
-            <div class="stat-value">{{ d.orders.toHandle }} <span class="text-base font-normal">รายการ</span></div>
-            <div class="mt-1 text-xs text-muted">รอดำเนินการ {{ d.orders.pending }} / กำลังทำ {{ d.orders.preparing }}</div>
+            <div class="mt-1 text-xs text-muted">
+              @if (d.costIncomplete) { <span class="text-warning">บางเมนูยังไม่มีต้นทุน</span> }
+              @else { ยอดขาย − ต้นทุนขนม ยังไม่หักค่าใช้จ่ายอื่น }
+            </div>
+          </a>
+          <a routerLink="/money" class="card card-pad hover:border-secondary">
+            <div class="mb-2 flex items-center gap-2 text-sm text-muted"><app-icon name="wallet" [size]="18" /> จ่ายไปวันนี้</div>
+            <div class="stat-value">{{ d.todayExpenses | baht: true }}</div>
+            <div class="mt-1 text-xs text-muted">ซื้อวัตถุดิบ + ค่าใช้จ่ายอื่น</div>
           </a>
           <a routerLink="/stock" [queryParams]="{ filter: 'low' }" class="card card-pad hover:border-secondary">
             <div class="mb-2 flex items-center gap-2 text-sm text-muted"><app-icon name="package" [size]="18" /> วัตถุดิบใกล้หมด</div>
@@ -91,7 +96,11 @@
                 }
               </div>
             } @else {
-              <p class="card card-pad text-sm text-muted">วันนี้ยังไม่มีรายการขาย</p>
+              <a routerLink="/sales" class="card card-pad flex items-center gap-3 text-sm text-muted hover:border-secondary">
+                <span class="flex-1">วันนี้ยังไม่ได้บันทึกยอดขาย</span>
+                <span class="text-primary">บันทึกเลย</span>
+                <app-icon name="chevron-right" [size]="18" class="text-primary" />
+              </a>
             }
           </section>
 
@@ -117,13 +126,20 @@
                 <span class="num text-sm text-primary-dark">{{ d.expiringSoon.count }}</span>
                 <app-icon name="chevron-right" [size]="18" class="text-muted" />
               </a>
-              <a routerLink="/orders" class="flex items-center gap-3 p-4 hover:bg-soft/50">
-                <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-soft text-primary"><app-icon name="clipboard" /></span>
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-normal">ออเดอร์ที่ต้องทำ</p>
-                  <p class="text-xs text-muted">รอดำเนินการ {{ d.orders.pending }} · กำลังเตรียม {{ d.orders.preparing }}</p>
-                </div>
-                <span class="num text-sm text-primary-dark">{{ d.orders.toHandle }}</span>
+              <a routerLink="/sales" class="flex items-center gap-3 p-4 hover:bg-soft/50">
+                @if (d.todayUnitsSold === 0) {
+                  <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><app-icon name="bag" /></span>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-normal">ยังไม่ได้บันทึกยอดขายวันนี้</p>
+                    <p class="text-xs text-muted">ขายเสร็จแล้วอย่าลืมบันทึก สต็อกจะได้ตรง</p>
+                  </div>
+                } @else {
+                  <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-success/12 text-success"><app-icon name="check" /></span>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-normal">บันทึกยอดขายวันนี้แล้ว</p>
+                    <p class="text-xs text-muted">ขายไป {{ d.todayUnitsSold }} ชิ้น — ขายเพิ่มก็บันทึกต่อได้</p>
+                  </div>
+                }
                 <app-icon name="chevron-right" [size]="18" class="text-muted" />
               </a>
             </div>

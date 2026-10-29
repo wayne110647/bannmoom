@@ -2,14 +2,15 @@ import { Provider } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import {
   HttpCostCalculationRepository, HttpDashboardRepository, HttpIngredientRepository, HttpProductRepository,
-  HttpRecipeRepository,
+  HttpRecipeRepository, HttpSalesRepository,
 } from './http/http-repositories';
 import {
   MockCostCalculationRepository, MockDashboardRepository, MockIngredientRepository, MockProductRepository,
-  MockRecipeRepository,
+  MockRecipeRepository, MockSalesRepository,
 } from './mock/mock-repositories';
 import {
   CostCalculationRepository, DashboardRepository, IngredientRepository, ProductRepository, RecipeRepository,
+  SalesRepository,
 } from './repositories';
 
 export const usingMockData = environment.dataSource === 'mock';
@@ -22,6 +23,7 @@ export function provideDataLayer(): Provider[] {
         { provide: ProductRepository, useClass: MockProductRepository },
         { provide: RecipeRepository, useClass: MockRecipeRepository },
         { provide: CostCalculationRepository, useClass: MockCostCalculationRepository },
+        { provide: SalesRepository, useClass: MockSalesRepository },
         { provide: DashboardRepository, useClass: MockDashboardRepository },
       ]
     : [
@@ -29,6 +31,7 @@ export function provideDataLayer(): Provider[] {
         { provide: ProductRepository, useClass: HttpProductRepository },
         { provide: RecipeRepository, useClass: HttpRecipeRepository },
         { provide: CostCalculationRepository, useClass: HttpCostCalculationRepository },
+        { provide: SalesRepository, useClass: HttpSalesRepository },
         { provide: DashboardRepository, useClass: HttpDashboardRepository },
       ];
 }

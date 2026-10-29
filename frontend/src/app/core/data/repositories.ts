@@ -1,7 +1,8 @@
 import { Observable } from 'rxjs';
 import {
-  AdjustmentInput, CostCalculationInput, DashboardSummary, Ingredient, IngredientInput, NewIngredientInput,
-  MenuRecipeInput, Product, Recipe, SavedCostCalculation, StockInInput, StockTransaction, UsageInput,
+  AdjustmentInput, CostCalculationInput, DashboardSummary, Expense, ExpenseInput, Ingredient, IngredientInput, Ledger,
+  MenuRecipeInput, NewIngredientInput, Product, Recipe, Sale, SaleInput, SaleResult, SavedCostCalculation, StockInInput,
+  StockTransaction, UsageInput,
 } from '../models';
 
 /**
@@ -42,6 +43,19 @@ export abstract class RecipeRepository {
 
 export abstract class CostCalculationRepository {
   abstract save(input: CostCalculationInput): Observable<SavedCostCalculation>;
+}
+
+/** Sales, other expenses and the income/expense ledger (รายรับ-รายจ่าย). Dates are 'YYYY-MM-DD'. */
+export abstract class SalesRepository {
+  abstract list(from: string, to: string): Observable<Sale[]>;
+  /** Saves even when stock runs short; the shortages come back for the owner to fix. */
+  abstract create(input: SaleInput): Observable<SaleResult>;
+  /** Cancels a sale and gives its stock back. */
+  abstract cancel(id: string): Observable<void>;
+  abstract createExpense(input: ExpenseInput): Observable<Expense>;
+  abstract removeExpense(id: string): Observable<void>;
+  abstract restoreExpense(id: string): Observable<void>;
+  abstract ledger(from: string, to: string): Observable<Ledger>;
 }
 
 export abstract class DashboardRepository {

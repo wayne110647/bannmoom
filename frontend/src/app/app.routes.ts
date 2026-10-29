@@ -26,13 +26,22 @@ export const routes: Routes = [
           { path: ':id/edit', title: 'แก้ไขเมนู', loadComponent: () => import('./features/recipes/recipe-form-page').then((m) => m.RecipeFormPage) },
         ],
       },
+      { path: 'sales', title: 'บันทึกยอดขาย', loadComponent: () => import('./features/sales/sales-page').then((m) => m.SalesPage) },
+      {
+        path: 'money',
+        children: [
+          { path: '', title: 'รายรับ-รายจ่าย', loadComponent: () => import('./features/money/money-page').then((m) => m.MoneyPage) },
+          { path: 'expense', title: 'บันทึกรายจ่าย', loadComponent: () => import('./features/money/expense-form-page').then((m) => m.ExpenseFormPage) },
+        ],
+      },
       { path: 'cost', title: 'คำนวณต้นทุน', loadComponent: () => import('./features/cost-calculator/cost-calculator-page').then((m) => m.CostCalculatorPage) },
       { path: 'more', title: 'เพิ่มเติม', loadComponent: () => import('./features/more/more-page').then((m) => m.MorePage) },
+      // Old links from before sales existed.
+      { path: 'orders', redirectTo: 'sales' },
+      { path: 'reports', redirectTo: 'money' },
       ...(
         [
-          ['orders', 'ออเดอร์และยอดขาย'],
           ['scan', 'สแกนสินค้า'],
-          ['reports', 'รายงาน'],
           ['settings', 'ตั้งค่า'],
         ] as const
       ).map(([path, title]) => ({

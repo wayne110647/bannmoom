@@ -2,11 +2,13 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../../environments/environment';
 import {
-  AdjustmentInput, CostCalculationInput, DashboardSummary, Ingredient, IngredientInput, NewIngredientInput,
-  MenuRecipeInput, Product, Recipe, SavedCostCalculation, StockInInput, StockTransaction, UsageInput,
+  AdjustmentInput, CostCalculationInput, DashboardSummary, Expense, ExpenseInput, Ingredient, IngredientInput, Ledger,
+  MenuRecipeInput, NewIngredientInput, Product, Recipe, Sale, SaleInput, SaleResult, SavedCostCalculation, StockInInput,
+  StockTransaction, UsageInput,
 } from '../../models';
 import {
   CostCalculationRepository, DashboardRepository, IngredientRepository, ProductRepository, RecipeRepository,
+  SalesRepository,
 } from '../repositories';
 
 /** Real API implementations (Cloudflare Workers → Neon). Used when environment.dataSource === 'api'. */
@@ -50,6 +52,18 @@ export class HttpRecipeRepository extends RecipeRepository {
 export class HttpCostCalculationRepository extends CostCalculationRepository {
   private http = inject(HttpClient);
   save(input: CostCalculationInput) { return this.http.post<SavedCostCalculation>(api('/cost-calculations'), input); }
+}
+
+@Injectable()
+export class HttpSalesRepository extends SalesRepository {
+  private http = inject(HttpClient);
+  list(from: string, to: string) { return this.http.get<Sale[]>(api('/sales'), { params: { from, to } }); }
+  create(input: SaleInput) { return this.http.post<SaleResult>(api('/sales'), input); }
+  cancel(id: string) { return this.http.post<void>(api(`/sales/${id}/void`), null); }
+  createExpense(input: ExpenseInput) { return this.http.post<Expense>(api('/expenses'), input); }
+  removeExpense(id: string) { return this.http.delete<void>(api(`/expenses/${id}`)); }
+  restoreExpense(id: string) { return this.http.post<void>(api(`/expenses/${id}/restore`), null); }
+  ledger(from: string, to: string) { return this.http.get<Ledger>(api('/reports/ledger'), { params: { from, to } }); }
 }
 
 @Injectable()
