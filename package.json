@@ -1,5 +1,6 @@
 {
   "name": "banmoom",
+  "version": "0.0.1",
   "private": true,
   "scripts": {
     "setup": "npm install && npm --prefix api install && npm --prefix frontend install",

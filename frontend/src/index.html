@@ -12,8 +12,64 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="icons/pumwaynedev.png">
+  <!-- Splash: plain CSS so it paints before the app's JS/CSS arrive. main.ts removes it. -->
+  <style>
+    #splash {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;
+      padding: 1.5rem; text-align: center; cursor: pointer;
+      background: radial-gradient(circle at 50% 38%, #ffffff 0%, #faf6f0 55%, #f3ece3 100%);
+      color: #513b2f; font-family: "Prompt", "Noto Sans Thai", system-ui, sans-serif;
+      transition: opacity 0.45s ease, visibility 0.45s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #splash.splash-out { opacity: 0; visibility: hidden; }
+    #splash img {
+      width: 168px; height: 168px; border-radius: 9999px; object-fit: cover;
+      box-shadow: 0 0 0 6px #ffffff, 0 0 0 7px #e9ded2, 0 18px 40px rgb(81 59 47 / 0.25);
+      margin-bottom: 0.75rem;
+      animation: splash-pop 0.6s cubic-bezier(0.32, 0.72, 0, 1) both;
+    }
+    #splash .splash-title { margin: 0; font-size: 1.6rem; font-weight: 600; letter-spacing: 0.01em; animation: splash-rise 0.6s 0.1s both; }
+    #splash .splash-by { margin: 0; font-size: 0.95rem; font-weight: 300; color: #8c7a6d; animation: splash-rise 0.6s 0.2s both; }
+    #splash .splash-by b { font-weight: 500; color: #806451; }
+    #splash .splash-version {
+      margin-top: 0.25rem; padding: 0.15rem 0.7rem; border-radius: 9999px;
+      background: #f3ece3; color: #806451; font-size: 0.75rem; font-weight: 400; letter-spacing: 0.04em;
+      animation: splash-rise 0.6s 0.3s both;
+    }
+    #splash .splash-dots { display: flex; gap: 0.4rem; margin-top: 1.25rem; }
+    #splash .splash-dots span { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: #c9a88d; animation: splash-dot 1s infinite ease-in-out; }
+    #splash .splash-dots span:nth-child(2) { animation-delay: 0.15s; }
+    #splash .splash-dots span:nth-child(3) { animation-delay: 0.3s; }
+    #splash .splash-skip { position: absolute; bottom: calc(1.25rem + env(safe-area-inset-bottom)); font-size: 0.75rem; color: #b3a397; }
+    @keyframes splash-pop { from { opacity: 0; transform: scale(0.85); } }
+    @keyframes splash-rise { from { opacity: 0; transform: translateY(8px); } }
+    @keyframes splash-dot { 0%, 80%, 100% { opacity: 0.3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-4px); } }
+    @media (prefers-reduced-motion: reduce) { #splash *, #splash { animation: none !important; transition: none !important; } }
+  </style>
 </head>
 <body>
+  <div id="splash" role="status" aria-label="กำลังเปิด Baan Moom Calculate">
+    <img src="icons/pumwaynedev.png" alt="pumwaynedev" width="168" height="168">
+    <p class="splash-title">Baan Moom Calculate</p>
+    <p class="splash-by">by <b>pumwaynedev</b> × <b>Claude dev</b></p>
+    <span class="splash-version">version 0.0.1</span>
+    <div class="splash-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <span class="splash-skip">แตะเพื่อข้าม</span>
+  </div>
+  <script>
+    // Once per opening of the app: a refresh in the same tab skips straight to the app.
+    (function () {
+      var splash = document.getElementById('splash');
+      try {
+        if (sessionStorage.getItem('banmoom.splashSeen')) { splash.remove(); return; }
+        sessionStorage.setItem('banmoom.splashSeen', '1');
+      } catch (e) { /* storage blocked: just show it */ }
+      splash.addEventListener('click', function () { splash.classList.add('splash-out'); });
+    })();
+  </script>
   <app-root></app-root>
 </body>
 </html>
