@@ -40,9 +40,11 @@ npm run dev       # เปิด database + API + หน้าเว็บ พ�
 3. ผูก Cloudflare กับ Neon:
    ```bash
    npx wrangler login
-   npx wrangler hyperdrive create banmoom-db --connection-string="<Neon pooled connection string>"
+   npx wrangler hyperdrive create banmoom-db --caching-disabled --connection-string="<Neon direct connection string>"
    ```
-   เอา `id` ที่ได้ไปแทน `REPLACE_WITH_HYPERDRIVE_ID` ใน `api/wrangler.jsonc`
+   - ใช้ connection string แบบ **direct** (ปิด "Connection pooling" ใน Neon) เพราะ Hyperdrive ทำ pooling ให้เอง
+   - `--caching-disabled` สำคัญ: ไม่งั้นหลังบันทึกยอดขาย/รับเข้า หน้าจออาจเห็นสต็อกเก่าค้างได้สักพัก
+   - เอา `id` ที่ได้ไปแทน `REPLACE_WITH_HYPERDRIVE_ID` ใน `api/wrangler.jsonc`
 4. Deploy (build หน้าเว็บ + อัป Worker): `npm run deploy` (ที่ root)
 5. **ล็อกให้เฉพาะคนในบ้าน:** Cloudflare dashboard → Zero Trust → Access → Applications → เพิ่ม Self-hosted app ครอบโดเมนของ Worker (`banmoom.<บัญชี>.workers.dev`) → Policy: Allow, Emails = อีเมลคนในบ้าน (ฟรีถึง 50 คน, เข้าด้วยรหัส OTP ทางอีเมล)
 

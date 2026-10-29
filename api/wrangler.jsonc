@@ -15,7 +15,8 @@
     "run_worker_first": ["/api/*"]
   },
   // "banmoom-db" → Neon. Create with:
-  //   npx wrangler hyperdrive create banmoom-db --connection-string="<Neon pooled connection string>"
+  //   npx wrangler hyperdrive create banmoom-db --caching-disabled --connection-string="<Neon direct connection string>"
+  // Direct (not -pooler) string: Hyperdrive pools itself. Caching off so stock/sales are never shown stale.
   // then paste the id below. Local `wrangler dev` uses localConnectionString instead
   // (override with env CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE, e.g. a Neon dev branch).
   "hyperdrive": [
