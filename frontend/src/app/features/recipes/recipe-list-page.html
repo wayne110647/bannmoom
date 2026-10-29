@@ -14,7 +14,7 @@
     <a routerLink="/recipes/new" class="btn-primary"><app-icon name="plus" [size]="18" /> เพิ่มเมนูแรก</a>
   </app-empty-state>
 } @else {
-  <ul class="grid gap-3 md:grid-cols-2">
+  <ul class="grid grid-cols-1 gap-3 md:grid-cols-2">
     @for (row of rows(); track row.recipe.id) {
       @let p = row.product;
       <li class="card relative flex gap-3 p-3" (appLongPress)="openMenu(row, $event)">

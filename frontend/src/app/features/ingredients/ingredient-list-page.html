@@ -38,7 +38,7 @@
   <app-empty-state icon="search" title="ไม่พบวัตถุดิบที่ค้นหา" detail="ลองเปลี่ยนคำค้นหาหรือตัวกรอง" />
 } @else {
   <!-- Phone/tablet: cards -->
-  <ul class="grid gap-2.5 pb-12 sm:grid-cols-2 lg:hidden">
+  <ul class="grid grid-cols-1 gap-2.5 pb-12 sm:grid-cols-2 lg:hidden">
     @for (ing of visible(); track ing.id) {
       <li class="relative">
         <a [routerLink]="['/stock', ing.id]" (appLongPress)="openMenu(ing, $event)"

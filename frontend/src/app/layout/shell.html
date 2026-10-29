@@ -2,6 +2,11 @@
 <app-action-sheet />
 <app-help />
 
+<!-- Computer: pinned to the bottom-right corner of every page, under the "วิธีใช้" button. -->
+<p class="pointer-events-none fixed right-6 bottom-2.5 z-20 hidden text-right text-[11px] leading-snug text-muted/70 lg:block">
+  version {{ app.version }}<br />{{ app.credit }}
+</p>
+
 <div class="min-h-dvh lg:flex">
   <!-- ============ Desktop sidebar ============ -->
   <aside class="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-surface/70 lg:flex">
@@ -67,6 +72,12 @@
 
     <main class="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-28 sm:px-6 lg:px-8 lg:pt-8 lg:pb-10">
       <router-outlet />
+
+      <!-- Phone: at the end of every page (the bottom-right corner is busy with buttons there). -->
+      <!-- mb clears the floating "วิธีใช้" button, which sits 9.5–12.25rem above the bottom. -->
+      <p class="mt-10 mb-24 text-right text-[11px] leading-snug text-muted/70 lg:hidden">
+        version {{ app.version }}<br />{{ app.credit }}
+      </p>
     </main>
   </div>
 </div>

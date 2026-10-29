@@ -18,6 +18,9 @@
 } @else {
   @let l = s.data;
 
+  <!-- Computer: totals stay on the left while the list scrolls on the right. Phone: one column. -->
+  <div class="lg:grid lg:grid-cols-5 lg:items-start lg:gap-6">
+  <div class="lg:sticky lg:top-8 lg:col-span-2">
   <!-- What's left -->
   <section class="card card-pad mb-3 text-center">
     <p class="text-sm text-muted">เหลือ (ขายได้ − จ่ายไป)</p>
@@ -40,7 +43,9 @@
     กำไรจากขนมที่ขาย (หักต้นทุนตามสูตร): <span class="num font-medium text-primary-dark">{{ l.grossProfit | baht }}</span>
     @if (l.costIncomplete) { <br /><span class="text-xs text-warning">บางเมนูยังไม่มีต้นทุน เลยไม่ได้นับในกำไรนี้</span> }
   </p>
+  </div>
 
+  <div class="lg:col-span-3">
   <!-- Entries by day -->
   @if (days().length === 0) {
     <app-empty-state icon="wallet" title="ยังไม่มีรายการในช่วงนี้"
@@ -83,4 +88,6 @@
       </section>
     }
   }
+  </div>
+  </div>
 }

@@ -185,7 +185,7 @@ function readSeen(): boolean {
     @if (page(); as p) {
       @if (!open()) {
         <button type="button" (click)="show()" aria-haspopup="dialog"
-          class="fixed right-4 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] z-30 flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-surface/95 py-2 pr-4 pl-3 text-sm font-medium text-primary-dark shadow-lg backdrop-blur active:bg-soft lg:right-6 lg:bottom-6"
+          class="fixed right-4 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] z-30 flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-surface/95 py-2 pr-4 pl-3 text-sm font-medium text-primary-dark shadow-lg backdrop-blur active:bg-soft lg:right-6 lg:bottom-14"
           [class.animate-help-nudge]="!seen()">
           <app-icon name="help" [size]="20" />
           วิธีใช้
